@@ -16,39 +16,81 @@ builtins: symmetric-encryption
 functions: mac/2
 equations: mac(m,k) = <m,senc(m,k)>
 
-rule Reveal_Key:
-	[ !SymKey(X, k) ] 
-	--[ Reveal(X) ]-> 
-	[ Out(k) ]
+rule Register:
+	[ Fr(~sk) ]
+	--[ Register($I,$R) ]-> 
+	[ !Lkt($I, $R, ~sk) ]
 
-rule Init_I:
-	[ Fr(~k_IR) ] 
-	--[ Secret($I,~k_IR), Honest($I), Honest($R), Role('I') ]->
-	[ !SymKey($I,~k_IR)
-	, !SymKey($R,~k_IR)
+rule Reveal_I:
+	[!Lkt(I,R,ltk)]
+	--[Reveal(I)]->
+	[Out(ltk)]
+	
+rule Reveal_R:
+	[!Lkt(I,R,ltk)]
+	--[Reveal(R)]->
+	[Out(ltk)]
+
+rule Init_I:	
+	[ Fr(~id)
+	, !Lkt(I, R, sk_IR)
 	] 
+	--[ Create(I, ~id, 'I') ]->
+	[ St_I_1(I, ~id, R, sk_IR) ] 
+
+rule Init_R:
+	[ Fr(~id)
+	, !Lkt(I, R, sk_IR)
+	] 
+	--[ Create(R, ~id, 'R') ]->
+	[ St_R_1(R, ~id, I, sk_IR) ] 
+
 
 rule I_1_Send:
-	[ AgSt($I,~k_IR), Fr(~x) ]
-	--[ Send($I,~x), Role('I'), Commit(a,b,<'R','I',t>) ]->
+	[ Fr(~x)
+	, St_I_1(I, ~id, R, sk_IR) ]
+	--[ Send(~x) ]->
 	[ Out(~x)
-	, AgSt($I,~x) 
+	, St_I_2(I, ~id, R, sk_IR, ~x) 
 	]
 
 rule R_1_Recv:
-	[ In(x) ]
-	--[ Receive($R,x), Role('R'), Running(b,a,<'R','I',t>) ]->
-	[ AgSt($R,x) ]
+	[ In(x)
+	, St_R_1(R, ~id, I, sk_IR) ]
+	--[ Receive(x) ]->
+	[ St_R_2(R, ~id, I, sk_IR, x) ]
 
 rule R_2_Send:
-	[ AgSt($R,x), AgSt($R,~k_IR) ] 
-	--[ Secret($R,~k_IR), Honest($R), Role('R'), Send($R,mac(x,~k_IR)) ]->
-	[ Out(mac(x,~k_IR)) ] 
+	let m = mac(x, sk_IR)
+	in
+	[ St_R_2(R, ~id, I, sk_IR, x) ] 
+	--[ Running(R, I, <'I', 'R', x>)
+	, Send(m) ]->
+	[ Out(m)
+	, St_R_2(R, ~id, I, sk_IR, x) ] 
 
 rule I_2_Recv:
-	[ In(mac(x,~k_IR)) ]
-	--[ Secret($I,~k_IR), Honest($I), Role('I'), Receive($I,mac(x,~k_IR)) ]->
-	[ AgSt($I,mac(x,~k_IR))	]
+	let m = mac(x, sk_IR)
+	in
+	[ In(m)
+	, St_I_2(I, ~id, R, sk_IR, x) ]
+	--[ Secret(I, sk_IR)
+	, Secret(R, sk_IR)
+	, Honest(I)
+	, Honest(R)
+	, Commit(I, R, <'I', 'R', x>)
+	, Receive(m)
+	, Finish() ]->
+	[ St_I_3(I, ~id, R, sk_IR, x) ]
+
+restriction onekeyperpair:
+  "All A B #i #j. Register(A,B)@i & Register(A,B)@j ==> #i = #j"
+
+
+lemma executable:
+  exists-trace
+    "Ex #i. Finish() @i
+    "
 
 lemma secrecy:
   "All A x #i. 
