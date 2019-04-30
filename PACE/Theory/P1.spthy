@@ -56,7 +56,7 @@ rule I_1_Send:
 	[ Fr(~x)
 	, St_I_1($I, id, $R, sk_IR) ]
 	--[ Send_I_1(~x) ]->
-	[ Out(x)
+	[ Out(~x)
 	, St_I_2($I, id, $R, sk_IR, ~x) 
 	]
 
@@ -93,7 +93,7 @@ restriction onekeyperpair:
 // This lemma gets verified
 lemma executable:
   exists-trace
-    "Ex #i. Finish() @i
+    "Ex #i. Finish() @i"
 
 // This lemma gets verified
 lemma noninjectiveagreementINITIATOR:
