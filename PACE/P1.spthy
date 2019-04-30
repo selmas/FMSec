@@ -90,16 +90,19 @@ rule I_2_Recv:
 restriction onekeyperpair:
   "All A B #i #j. Register(A, B)@i & Register(A, B)@j ==> #i = #j"
 
+// This lemma gets verified
 lemma executable:
   exists-trace
     "Ex #i. Finish() @i
 
+// This lemma gets verified
 lemma noninjectiveagreementINITIATOR:
   "All a b t #i. 
     Commit(a, b, <'I', 'R', t>) @i
     ==> (Ex #j. Running(b, a, <'I', 'R', t>) @j)
         | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
 
+// This lemma gets verified
 lemma injectiveagreementINITIATOR:
   "All a b t #i. 
     Commit(a, b, <'I', 'R', t>) @i
