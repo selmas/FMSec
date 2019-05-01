@@ -1,0 +1,173 @@
+theory P2a
+begin
+
+/*
+  Assignment 1.2: Mutual Authentication
+
+  We model two, interleaving instances of P1,
+  one initiated by A and the other one by B:
+	
+	1. A -> B: x
+	2. B -> A: y
+    3. B -> A: [x]k(A, B)
+    4. B -> A: [y]k(B, A)
+
+  The Goal is agreement of each role with the other role on both nonces x and y
+*/
+
+builtins: symmetric-encryption
+functions: mac/2
+equations: mac(m, k) = <m, senc(m, k)>
+
+/*
+	Questions:
+		commit on x or on mac
+		construct mac function or simply send encryption
+*/
+
+rule Register:
+	[ Fr(~sk) ]
+	--[ Register($I, $R) ]-> 
+	[ !Lkt($I, $R, ~sk) ]
+
+rule Reveal_A:
+	[!Lkt($I, $R, ltk)]
+	--[Reveal($I)]->
+	[Out(ltk)]
+	
+rule Reveal_B:
+	[!Lkt($I, $R, ltk)]
+	--[Reveal($R)]->
+	[Out(ltk)]
+
+rule Init_A:	
+	[ Fr(~id)
+	, !Lkt($A, $B, sk_AB)
+	, !Lkt($B, $A, sk_BA)
+	] 
+	--[ Create($A, ~id, 'A') ]->
+	[ St_A_1($A, ~id, $B, sk_AB, sk_BA) ] 
+
+rule Init_B:
+	[ Fr(~id)
+	, !Lkt($A, $R, sk_AB)
+	, !Lkt($B, $A, sk_BA)
+	] 
+	--[ Create($B, ~id, 'B') ]->
+	[ St_B_1($B, ~id, $A, sk_AB, sk_BA) ] 
+
+// A -> B: x
+rule A_1_Send:
+	[ Fr(~x)
+	, St_A_1($A, id, $B, sk_AB, sk_BA) ]
+	--[ Send_A_1(~x) ]->
+	[ Out(~x)
+	, St_A_2($A, id, $B, sk_AB, sk_BA, ~x) 
+	]
+
+rule B_1_Recv:
+	[ In(x)
+	, St_B_1($B, id, $A, sk_AB, sk_BA) ]
+	--[ Receive_B_1(x) ]->
+	[ St_B_2($B, id, $A, sk_AB, sk_BA, x) ]
+
+// B -> A: y
+rule B_2_Send:
+	[ Fr(~y)
+	, St_B_2($B, id, $A, sk_AB, sk_BA, x) ]
+	--[ Send_B_2(~y) ]->
+	[ Out(~y)
+	, St_B_3($B, id, $A, sk_AB, sk_BA, x, ~y) 
+	]
+
+rule A_2_Recv:
+	[ In(y)
+	, St_A_2($A, id, $B, sk_AB, sk_BA, x) ]
+	--[ Receive_A_2(y) ]->
+	[ St_A_3($A, id, $B, sk_AB, sk_BA, x, y) ]
+
+// B -> A: [x]k(A,B)
+rule B_3_Send:
+	let m1 = mac(x, sk_AB)
+	in
+	[ St_B_3($B, id, $A, sk_AB, sk_BA, x, y) ] 
+	--[ Running($B, $A, <'A', 'B', x>)
+	, Send_B_3(m1) ]->
+	[ Out(m1)
+	, St_B_4($B, id, $A, sk_AB, sk_BA, x, y) ] 
+
+rule A_3_Recv:
+	let m2 = mac(x, sk_AB)
+	in
+	[ In(m2)
+	, St_A_3($A, id, $B, sk_AB, sk_BA, x, y) ]
+	--[ Honest($A)
+	, Honest($B)
+	, Commit($A, $B, <'A', 'B', x>)
+	, Receive_A_3(m2)
+	, Finish($A) ]->
+	[ St_A_4($A, id, $B, sk_AB, sk_BA, x, y) ]
+
+// A -> B: [y]k(B,A)
+rule A_4_Send:
+	let m3 = mac(y, sk_BA)
+	in
+	[ St_A_4($A, id, $B, sk_AB, sk_BA, x, y) ] 
+	--[ Running($A, $B, <'B', 'A', y>)
+	, Send_A_4(m3) ]->
+	[ Out(m3)
+	, St_A_5($A, id, $B, sk_AB, sk_BA, x, y) ] 
+
+rule B_4_Recv:
+	let m4 = mac(y, sk_BA)
+	in
+	[ In(m4)
+	, St_B_4($B, id, $A, sk_AB, sk_BA, x, y) ]
+	--[ Honest($A)
+	, Honest($B)
+	, Commit($B, $A, <'B', 'A', y>)
+	, Receive_B_4(m4)
+	, Finish($B) ]->
+	[ St_B_5($B, id, $A, sk_AB, sk_BA, x, y) ]
+
+restriction onekeyperpair:
+  "All A B #i #j. Register(A, B)@i & Register(A, B)@j ==> #i = #j"
+
+// This lemma gets verified
+lemma executable:
+  exists-trace
+    "Ex A B #i #j. Finish(A)@i & Finish(B)@j & not (A = B)"
+
+// This lemma gets verified
+lemma noninjectiveagreementINITIATOR:
+  "All a b t #i. 
+    Commit(a,b,<'I','R',t>) @i
+    ==> (Ex #j. Running(b,a,<'I','R',t>) @j)
+        | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+// This lemma gets verified
+lemma injectiveagreementINITIATOR:
+  "All a b t #i. 
+    Commit(a,b,<'I','R',t>) @i
+    ==> (Ex #j. Running(b,a,<'I','R',t>) @j 
+        & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
+                           & not (#i2 = #i)))
+              | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+// This lemma gets verified
+lemma noninjectiveagreementRESPONDER:
+  "All a b t #i. 
+    Commit(a,b,<'R','I',t>) @i
+    ==> (Ex #j. Running(b,a,<'R','I',t>) @j)
+        | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+lemma injectiveagreementRESPONDER:
+  "All a b t #i. 
+    Commit(a,b,<'R','I',t>) @i
+    ==> (Ex #j. Running(b,a,<'R','I',t>) @j 
+              & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
+                                 & not (#i2 = #i)))
+              | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+
+end
