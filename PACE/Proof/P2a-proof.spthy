@@ -68,78 +68,78 @@ rule (modulo E) A_2_Recv:
 
   /* has exactly the trivial AC variant */
 
-rule (modulo E) B_3_Send:
-   [ St_B_3( $B, id, $A, sk_AB, sk_BA, x, y ) ]
-  --[ Running( $B, $A, <'A', 'B', x> ), Send_B_3( mac(x, sk_AB) ) ]->
-   [ Out( mac(x, sk_AB) ), St_B_4( $B, id, $A, sk_AB, sk_BA, x, y ) ]
+rule (modulo E) A_3_Send:
+   [ St_A_3( $A, id, $B, sk_AB, sk_BA, x, y ) ]
+  --[ Running( $A, $B, <'B', 'A', y> ), Send_A_3( mac(y, sk_BA) ) ]->
+   [ Out( mac(y, sk_BA) ), St_A_4( $A, id, $B, sk_AB, sk_BA, x, y ) ]
 
   /*
-  rule (modulo AC) B_3_Send:
-     [ St_B_3( $B, id, $A, sk_AB, sk_BA, x, y ) ]
+  rule (modulo AC) A_3_Send:
+     [ St_A_3( $A, id, $B, sk_AB, sk_BA, x, y ) ]
     --[
-    Running( $B, $A, <'A', 'B', x> ), Send_B_3( <x, senc(x, sk_AB)> )
-    ]->
-     [
-     Out( <x, senc(x, sk_AB)> ),
-     St_B_4( $B, id, $A, sk_AB, sk_BA, x, y )
-     ]
-  */
-
-rule (modulo E) A_3_Recv:
-   [ In( mac(x, sk_AB) ), St_A_3( $A, id, $B, sk_AB, sk_BA, x, y ) ]
-  --[
-  Honest( $A ), Honest( $B ), Commit( $A, $B, <'A', 'B', x> ),
-  Receive_A_3( mac(x, sk_AB) ), Finish( $A )
-  ]->
-   [ St_A_4( $A, id, $B, sk_AB, sk_BA, x, y ) ]
-
-  /*
-  rule (modulo AC) A_3_Recv:
-     [
-     In( <x, senc(x, sk_AB)> ), St_A_3( $A, id, $B, sk_AB, sk_BA, x, y )
-     ]
-    --[
-    Honest( $A ), Honest( $B ), Commit( $A, $B, <'A', 'B', x> ),
-    Receive_A_3( <x, senc(x, sk_AB)> ), Finish( $A )
-    ]->
-     [ St_A_4( $A, id, $B, sk_AB, sk_BA, x, y ) ]
-  */
-
-rule (modulo E) A_4_Send:
-   [ St_A_4( $A, id, $B, sk_AB, sk_BA, x, y ) ]
-  --[ Running( $A, $B, <'B', 'A', y> ), Send_A_4( mac(y, sk_BA) ) ]->
-   [ Out( mac(y, sk_BA) ), St_A_5( $A, id, $B, sk_AB, sk_BA, x, y ) ]
-
-  /*
-  rule (modulo AC) A_4_Send:
-     [ St_A_4( $A, id, $B, sk_AB, sk_BA, x, y ) ]
-    --[
-    Running( $A, $B, <'B', 'A', y> ), Send_A_4( <y, senc(y, sk_BA)> )
+    Running( $A, $B, <'B', 'A', y> ), Send_A_3( <y, senc(y, sk_BA)> )
     ]->
      [
      Out( <y, senc(y, sk_BA)> ),
-     St_A_5( $A, id, $B, sk_AB, sk_BA, x, y )
+     St_A_4( $A, id, $B, sk_AB, sk_BA, x, y )
      ]
   */
 
-rule (modulo E) B_4_Recv:
-   [ In( mac(y, sk_BA) ), St_B_4( $B, id, $A, sk_AB, sk_BA, x, y ) ]
+rule (modulo E) B_3_Recv:
+   [ In( mac(y, sk_BA) ), St_B_3( $B, id, $A, sk_AB, sk_BA, x, y ) ]
   --[
   Honest( $A ), Honest( $B ), Commit( $B, $A, <'B', 'A', y> ),
-  Receive_B_4( mac(y, sk_BA) ), Finish( $B )
+  Receive_B_3( mac(y, sk_BA) ), Finish( $B )
   ]->
-   [ St_B_5( $B, id, $A, sk_AB, sk_BA, x, y ) ]
+   [ St_B_4( $B, id, $A, sk_AB, sk_BA, x, y ) ]
 
   /*
-  rule (modulo AC) B_4_Recv:
+  rule (modulo AC) B_3_Recv:
      [
-     In( <y, senc(y, sk_BA)> ), St_B_4( $B, id, $A, sk_AB, sk_BA, x, y )
+     In( <y, senc(y, sk_BA)> ), St_B_3( $B, id, $A, sk_AB, sk_BA, x, y )
      ]
     --[
     Honest( $A ), Honest( $B ), Commit( $B, $A, <'B', 'A', y> ),
-    Receive_B_4( <y, senc(y, sk_BA)> ), Finish( $B )
+    Receive_B_3( <y, senc(y, sk_BA)> ), Finish( $B )
     ]->
-     [ St_B_5( $B, id, $A, sk_AB, sk_BA, x, y ) ]
+     [ St_B_4( $B, id, $A, sk_AB, sk_BA, x, y ) ]
+  */
+
+rule (modulo E) B_4_Send:
+   [ St_B_4( $B, id, $A, sk_AB, sk_BA, x, y ) ]
+  --[ Running( $B, $A, <'A', 'B', x> ), Send_B_4( mac(x, sk_AB) ) ]->
+   [ Out( mac(x, sk_AB) ), St_B_5( $B, id, $A, sk_AB, sk_BA, x, y ) ]
+
+  /*
+  rule (modulo AC) B_4_Send:
+     [ St_B_4( $B, id, $A, sk_AB, sk_BA, x, y ) ]
+    --[
+    Running( $B, $A, <'A', 'B', x> ), Send_B_4( <x, senc(x, sk_AB)> )
+    ]->
+     [
+     Out( <x, senc(x, sk_AB)> ),
+     St_B_5( $B, id, $A, sk_AB, sk_BA, x, y )
+     ]
+  */
+
+rule (modulo E) A_4_Recv:
+   [ In( mac(x, sk_AB) ), St_A_4( $A, id, $B, sk_AB, sk_BA, x, y ) ]
+  --[
+  Honest( $A ), Honest( $B ), Commit( $A, $B, <'A', 'B', x> ),
+  Receive_A_4( mac(x, sk_AB) ), Finish( $A )
+  ]->
+   [ St_A_5( $A, id, $B, sk_AB, sk_BA, x, y ) ]
+
+  /*
+  rule (modulo AC) A_4_Recv:
+     [
+     In( <x, senc(x, sk_AB)> ), St_A_4( $A, id, $B, sk_AB, sk_BA, x, y )
+     ]
+    --[
+    Honest( $A ), Honest( $B ), Commit( $A, $B, <'A', 'B', x> ),
+    Receive_A_4( <x, senc(x, sk_AB)> ), Finish( $A )
+    ]->
+     [ St_A_5( $A, id, $B, sk_AB, sk_BA, x, y ) ]
   */
 
 restriction onekeyperpair:
@@ -157,40 +157,22 @@ guarded formula characterizing all satisfying traces:
 */
 simplify
 solve( Finish( A ) @ #i )
-  case A_3_Recv
-  solve( St_A_3( $A, id, $B, sk_AB, sk_BA, x, y ) ▶₁ #i )
-    case A_2_Recv
+  case A_4_Recv
+  solve( St_A_4( $A, id, $B, sk_AB, sk_BA, x, y ) ▶₁ #i )
+    case A_3_Send
     solve( Finish( B.1 ) @ #j )
-      case A_3_Recv
-      solve( St_A_3( $A.1, id.1, $B.1, sk_AB, sk_BA, x.1, y.1 ) ▶₁ #j )
-        case A_2_Recv
+      case A_4_Recv
+      solve( St_A_4( $A.1, id.1, $B.1, sk_AB, sk_BA, x.1, y.1 ) ▶₁ #j )
+        case A_3_Send
         solve( !KU( senc(~x, ~sk) ) @ #vk.2 )
-          case A_4_Send
+          case A_3_Send
           solve( !KU( senc(~x.1, ~sk.2) ) @ #vk.6 )
-            case A_4_Send
-            solve( !KU( senc(~x.2, ~sk.1) ) @ #vk.10 )
-              case A_4_Send
-              solve( !KU( senc(~x.3, ~sk.3) ) @ #vk.13 )
-                case B_3_Send
-                solve( !KU( senc(~x.4, ~sk) ) @ #vk.16 )
-                  case B_3_Send
-                  solve( !KU( ~x ) @ #vk.9 )
-                    case A_1_Send
-                    solve( !KU( ~x.1 ) @ #vk.12 )
-                      case A_1_Send
-                      solve( !KU( ~x.2 ) @ #vk.14 )
-                        case A_1_Send
-                        solve( !KU( ~x.3 ) @ #vk.15 )
-                          case A_1_Send
-                          solve( !KU( ~x.4 ) @ #vk.16 )
-                            case A_1_Send
-                            SOLVED // trace found
-                          qed
-                        qed
-                      qed
-                    qed
-                  qed
-                qed
+            case A_3_Send
+            solve( !KU( ~x ) @ #vk.3 )
+              case A_1_Send
+              solve( !KU( ~x.1 ) @ #vk.6 )
+                case A_1_Send
+                SOLVED // trace found
               qed
             qed
           qed

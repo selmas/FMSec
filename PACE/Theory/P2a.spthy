@@ -7,12 +7,11 @@ begin
   We model two, interleaving instances of P1,
   one initiated by A and the other one by B:
 
-  MAYBE W
-	
 	1. A -> B: x
 	2. B -> A: y
-    3. B -> A: [x]k(A, B)
-    4. B -> A: [y]k(B, A)
+    3. A -> B: [y]k(B, A)
+    4. B -> A: [x]k(A, B)
+
 
   The Goal is agreement of each role with the other role on both nonces x and y
 */
@@ -88,49 +87,49 @@ rule A_2_Recv:
 	--[ Receive_A_2(y) ]->
 	[ St_A_3($A, id, $B, sk_AB, sk_BA, x, y) ]
 
-// B -> A: [x]k(A,B)
-rule B_3_Send:
-	let m1 = mac(x, sk_AB)
+// A -> B: [y]k(B,A)
+rule A_3_Send:
+	let m1 = mac(y, sk_BA)
 	in
-	[ St_B_3($B, id, $A, sk_AB, sk_BA, x, y) ] 
-	--[ Running($B, $A, <'A', 'B', x>)
-	, Send_B_3(m1) ]->
+	[ St_A_3($A, id, $B, sk_AB, sk_BA, x, y) ] 
+	--[ Running($A, $B, <'B', 'A', y>)
+	, Send_A_3(m1) ]->
 	[ Out(m1)
-	, St_B_4($B, id, $A, sk_AB, sk_BA, x, y) ] 
+	, St_A_4($A, id, $B, sk_AB, sk_BA, x, y) ] 
 
-rule A_3_Recv:
-	let m2 = mac(x, sk_AB)
+rule B_3_Recv:
+	let m2 = mac(y, sk_BA)
 	in
 	[ In(m2)
-	, St_A_3($A, id, $B, sk_AB, sk_BA, x, y) ]
-	--[ Honest($A)
-	, Honest($B)
-	, Commit($A, $B, <'A', 'B', x>)
-	, Receive_A_3(m2)
-	, Finish($A) ]->
-	[ St_A_4($A, id, $B, sk_AB, sk_BA, x, y) ]
-
-// A -> B: [y]k(B,A)
-rule A_4_Send:
-	let m3 = mac(y, sk_BA)
-	in
-	[ St_A_4($A, id, $B, sk_AB, sk_BA, x, y) ] 
-	--[ Running($A, $B, <'B', 'A', y>)
-	, Send_A_4(m3) ]->
-	[ Out(m3)
-	, St_A_5($A, id, $B, sk_AB, sk_BA, x, y) ] 
-
-rule B_4_Recv:
-	let m4 = mac(y, sk_BA)
-	in
-	[ In(m4)
-	, St_B_4($B, id, $A, sk_AB, sk_BA, x, y) ]
+	, St_B_3($B, id, $A, sk_AB, sk_BA, x, y) ]
 	--[ Honest($A)
 	, Honest($B)
 	, Commit($B, $A, <'B', 'A', y>)
-	, Receive_B_4(m4)
+	, Receive_B_3(m2)
 	, Finish($B) ]->
-	[ St_B_5($B, id, $A, sk_AB, sk_BA, x, y) ]
+	[ St_B_4($B, id, $A, sk_AB, sk_BA, x, y) ]
+
+// B -> A: [x]k(A,B)
+rule B_4_Send:
+	let m3 = mac(x, sk_AB)
+	in
+	[ St_B_4($B, id, $A, sk_AB, sk_BA, x, y) ] 
+	--[ Running($B, $A, <'A', 'B', x>)
+	, Send_B_4(m3) ]->
+	[ Out(m3)
+	, St_B_5($B, id, $A, sk_AB, sk_BA, x, y) ] 
+
+rule A_4_Recv:
+	let m4 = mac(x, sk_AB)
+	in
+	[ In(m4)
+	, St_A_4($A, id, $B, sk_AB, sk_BA, x, y) ]
+	--[ Honest($A)
+	, Honest($B)
+	, Commit($A, $B, <'A', 'B', x>)
+	, Receive_A_4(m4)
+	, Finish($A) ]->
+	[ St_A_5($A, id, $B, sk_AB, sk_BA, x, y) ]
 
 restriction onekeyperpair:
   "All A B #i #j. Register(A, B)@i & Register(A, B)@j ==> #i = #j"
