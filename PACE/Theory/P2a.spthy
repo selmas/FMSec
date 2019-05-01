@@ -6,6 +6,8 @@ begin
 
   We model two, interleaving instances of P1,
   one initiated by A and the other one by B:
+
+  MAYBE W
 	
 	1. A -> B: x
 	2. B -> A: y
