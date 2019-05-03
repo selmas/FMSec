@@ -1,0 +1,184 @@
+theory P3a
+begin
+
+/*
+  Assignment 1.3: Introducing a session key
+
+	Instead of using the long-term key k(A, B) for macing, we mac in both directions with the
+	session key Kab, which is derived from the long-term key and the nonces x and y using a key
+	derivation function kdf as follows:		Kab = kdf(k(A, B), x, y)
+
+	1. A -> B: x
+	2. B -> A: y
+	3. A -> B: [y]Kab
+	4. B -> A: [x]Kab
+
+
+  The Goal is agreement of each role with the other role on both nonces x and y
+  and secrecy of the session key Kab.
+*/
+
+builtins: symmetric-encryption, hashing
+functions: mac/2, kdf/3
+equations: mac(m, k) = <m, senc(m, k)>
+
+rule Register:
+	[ Fr(~sk) ]
+	--[ Register($I, $R) ]-> 
+	[ !Lkt($I, $R, ~sk) ]
+
+rule Reveal_A:
+	[!Lkt($I, $R, ltk)]
+	--[Reveal($I)]->
+	[Out(ltk)]
+	
+rule Reveal_B:
+	[!Lkt($I, $R, ltk)]
+	--[Reveal($R)]->
+	[Out(ltk)]
+
+rule Init_A:	
+	[ Fr(~id)
+	, !Lkt($A, $B, sk_AB)
+	] 
+	--[ Create($A, ~id, 'A') ]->
+	[ St_A_1($A, ~id, $B, sk_AB) ] 
+
+rule Init_B:
+	[ Fr(~id)
+	, !Lkt($A, $R, sk_AB)
+	] 
+	--[ Create($B, ~id, 'B') ]->
+	[ St_B_1($B, ~id, $A, sk_AB) ] 
+
+// A -> B: x
+rule A_1_Send:
+	[ Fr(~x)
+	, St_A_1($A, id, $B, sk_AB) ]
+	--[ Send_A_1(~x) ]->
+	[ Out(~x)
+	, St_A_2($A, id, $B, sk_AB, ~x) 
+	]
+
+rule B_1_Recv:
+	[ In(x)
+	, St_B_1($B, id, $A, sk_AB) ]
+	--[ Receive_B_1(x) ]->
+	[ St_B_2($B, id, $A, sk_AB, x) ]
+
+// B -> A: y
+rule B_2_Send:
+	[ Fr(~y)
+	, St_B_2($B, id, $A, sk_AB, x) ]
+	--[ Send_B_2(~y) ]->
+	[ Out(~y)
+	, St_B_3($B, id, $A, sk_AB, x, ~y) 
+	]
+
+rule A_2_Recv:
+	[ In(y)
+	, St_A_2($A, id, $B, sk_AB, x) ]
+	--[ Receive_A_2(y) ]->
+	[ St_A_3($A, id, $B, sk_AB, x, y) ]
+
+// A -> B: [y]Kab
+rule A_3_Send:
+	let 
+		Kab = kdf(sk_AB, x, y)
+		m1 = mac(y, Kab)
+	in
+	[ St_A_3($A, id, $B, sk_AB, x, y) ] 
+	--[ Running($A, $B, <'B', 'A', y>)
+	, Send_A_3(m1) ]->
+	[ Out(m1)
+	, St_A_4($A, id, $B, sk_AB, x, y, Kab) ] 
+
+rule B_3_Recv:
+	let 
+		Kab = kdf(sk_AB,x,y)
+		m2 = mac(y, Kab)
+	in
+	[ In(m2)
+	, St_B_3($B, id, $A, sk_AB, x, y) ]
+	--[ Secret($B, Kab)
+	, Honest($A)
+	, Honest($B)
+	, Commit($B, $A, <'B', 'A', y>)
+	, Receive_B_3(m2)
+	, Finish($B) ]->
+	[ St_B_4($B, id, $A, sk_AB, x, y, Kab) ]
+
+// B -> A: [x]Kab
+rule B_4_Send:
+	let 
+		Kab = kdf(sk_AB,x,y)
+		m3 = mac(x, Kab)
+	in
+	[ St_B_4($B, id, $A, sk_AB, x, y, Kab) ] 
+	--[ Running($B, $A, <'A', 'B', x>)
+	, Send_B_4(m3) ]->
+	[ Out(m3)
+	, St_B_5($B, id, $A, sk_AB, x, y, Kab) ] 
+
+rule A_4_Recv:
+	let 
+		Kab = kdf(sk_AB,x,y)
+		m4 = mac(x, Kab)
+	in
+	[ In(m4)
+	, St_A_4($A, id, $B, sk_AB, x, y, Kab) ]
+	--[ Secret($A, Kab)
+	, Honest($A)
+	, Honest($B)
+	, Commit($A, $B, <'A', 'B', x>)
+	, Receive_A_4(m4)
+	, Finish($A) ]->
+	[ St_A_5($A, id, $B, sk_AB, x, y, Kab) ]
+
+restriction onekeyperpair:
+  "All A B #i #j. Register(A, B)@i & Register(A, B)@j ==> #i = #j"
+
+// This lemma gets verified
+lemma executable:
+  exists-trace
+    "Ex A B #i #j. Finish(A)@i & Finish(B)@j & not (A = B)"
+
+lemma secrecy:
+  "All A x #i. 
+    Secret(A,x) @i ==> 
+    not (Ex #j. K(x)@j)
+        | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+// This lemma gets verified
+lemma noninjectiveagreementINITIATOR:
+  "All a b t #i. 
+    Commit(a,b,<'I','R',t>) @i
+    ==> (Ex #j. Running(b,a,<'I','R',t>) @j)
+        | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+// This lemma gets verified
+lemma injectiveagreementINITIATOR:
+  "All a b t #i. 
+    Commit(a,b,<'I','R',t>) @i
+    ==> (Ex #j. Running(b,a,<'I','R',t>) @j 
+        & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
+                           & not (#i2 = #i)))
+              | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+// This lemma gets verified
+lemma noninjectiveagreementRESPONDER:
+  "All a b t #i. 
+    Commit(a,b,<'R','I',t>) @i
+    ==> (Ex #j. Running(b,a,<'R','I',t>) @j)
+        | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+lemma injectiveagreementRESPONDER:
+  "All a b t #i. 
+    Commit(a,b,<'R','I',t>) @i
+    ==> (Ex #j. Running(b,a,<'R','I',t>) @j 
+              & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
+                                 & not (#i2 = #i)))
+              | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+
+end
