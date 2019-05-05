@@ -1,4 +1,4 @@
-theory P2a
+theory P2b
 begin
 
 /*
@@ -9,22 +9,17 @@ begin
 
 	1. A -> B: x
 	2. B -> A: y
-    3. A -> B: [y]k(B, A)
-    4. B -> A: [x]k(A, B)
+    3. A -> B: [A,y]k(B, A)
+    4. B -> A: [B,x]k(A, B)
 
 
-  The Goal is agreement of each role with the other role on both nonces x and y
+  In order to reach agreement of each role with the other role on both nonces x and y
+  the sender needs to be included in the maced message to prevent a Man-in-the-Middle attack.
 */
 
 builtins: symmetric-encryption
 functions: mac/2
 equations: mac(m, k) = <m, senc(m, k)>
-
-/*
-	Questions:
-		commit on x or on mac
-		construct mac function or simply send encryption
-*/
 
 rule Register:
 	[ Fr(~sk) ]
@@ -87,9 +82,9 @@ rule A_2_Recv:
 	--[ Receive_A_2(y) ]->
 	[ St_A_3($A, id, $B, sk_AB, sk_BA, x, y) ]
 
-// A -> B: [y]k(B,A)
+// A -> B: [A,y]k(B,A)
 rule A_3_Send:
-	let m1 = mac(y, sk_BA)
+	let m1 = mac(<$A,y>, sk_BA)
 	in
 	[ St_A_3($A, id, $B, sk_AB, sk_BA, x, y) ] 
 	--[ Running($A, $B, <'R', 'I', y>)
@@ -98,7 +93,7 @@ rule A_3_Send:
 	, St_A_4($A, id, $B, sk_AB, sk_BA, x, y) ] 
 
 rule B_3_Recv:
-	let m2 = mac(y, sk_BA)
+	let m2 = mac(<$A,y>, sk_BA)
 	in
 	[ In(m2)
 	, St_B_3($B, id, $A, sk_AB, sk_BA, x, y) ]
@@ -109,9 +104,9 @@ rule B_3_Recv:
 	, Finish($B) ]->
 	[ St_B_4($B, id, $A, sk_AB, sk_BA, x, y) ]
 
-// B -> A: [x]k(A,B)
+// B -> A: [B,x]k(A,B)
 rule B_4_Send:
-	let m3 = mac(x, sk_AB)
+	let m3 = mac(<x,$B>, sk_AB)
 	in
 	[ St_B_4($B, id, $A, sk_AB, sk_BA, x, y) ] 
 	--[ Running($B, $A, <'I', 'R', x>)
@@ -120,7 +115,7 @@ rule B_4_Send:
 	, St_B_5($B, id, $A, sk_AB, sk_BA, x, y) ] 
 
 rule A_4_Recv:
-	let m4 = mac(x, sk_AB)
+	let m4 = mac(<x,$B>, sk_AB)
 	in
 	[ In(m4)
 	, St_A_4($A, id, $B, sk_AB, sk_BA, x, y) ]
