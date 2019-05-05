@@ -34,7 +34,7 @@ rule (modulo E) Init_A:
   /* has exactly the trivial AC variant */
 
 rule (modulo E) Init_B:
-   [ Fr( ~id ), !Lkt( $A, $R, sk_AB ), !Lkt( $B, $A, sk_BA ) ]
+   [ Fr( ~id ), !Lkt( $A, $B, sk_AB ), !Lkt( $B, $A, sk_BA ) ]
   --[ Create( $B, ~id, 'B' ) ]->
    [ St_B_1( $B, ~id, $A, sk_AB, sk_BA ) ]
 
@@ -70,14 +70,14 @@ rule (modulo E) A_2_Recv:
 
 rule (modulo E) A_3_Send:
    [ St_A_3( $A, id, $B, sk_AB, sk_BA, x, y ) ]
-  --[ Running( $A, $B, <'B', 'A', y> ), Send_A_3( mac(y, sk_BA) ) ]->
+  --[ Running( $A, $B, <'R', 'I', y> ), Send_A_3( mac(y, sk_BA) ) ]->
    [ Out( mac(y, sk_BA) ), St_A_4( $A, id, $B, sk_AB, sk_BA, x, y ) ]
 
   /*
   rule (modulo AC) A_3_Send:
      [ St_A_3( $A, id, $B, sk_AB, sk_BA, x, y ) ]
     --[
-    Running( $A, $B, <'B', 'A', y> ), Send_A_3( <y, senc(y, sk_BA)> )
+    Running( $A, $B, <'R', 'I', y> ), Send_A_3( <y, senc(y, sk_BA)> )
     ]->
      [
      Out( <y, senc(y, sk_BA)> ),
@@ -88,7 +88,7 @@ rule (modulo E) A_3_Send:
 rule (modulo E) B_3_Recv:
    [ In( mac(y, sk_BA) ), St_B_3( $B, id, $A, sk_AB, sk_BA, x, y ) ]
   --[
-  Honest( $A ), Honest( $B ), Commit( $B, $A, <'B', 'A', y> ),
+  Honest( $A ), Honest( $B ), Commit( $B, $A, <'R', 'I', y> ),
   Receive_B_3( mac(y, sk_BA) ), Finish( $B )
   ]->
    [ St_B_4( $B, id, $A, sk_AB, sk_BA, x, y ) ]
@@ -99,7 +99,7 @@ rule (modulo E) B_3_Recv:
      In( <y, senc(y, sk_BA)> ), St_B_3( $B, id, $A, sk_AB, sk_BA, x, y )
      ]
     --[
-    Honest( $A ), Honest( $B ), Commit( $B, $A, <'B', 'A', y> ),
+    Honest( $A ), Honest( $B ), Commit( $B, $A, <'R', 'I', y> ),
     Receive_B_3( <y, senc(y, sk_BA)> ), Finish( $B )
     ]->
      [ St_B_4( $B, id, $A, sk_AB, sk_BA, x, y ) ]
@@ -107,14 +107,14 @@ rule (modulo E) B_3_Recv:
 
 rule (modulo E) B_4_Send:
    [ St_B_4( $B, id, $A, sk_AB, sk_BA, x, y ) ]
-  --[ Running( $B, $A, <'A', 'B', x> ), Send_B_4( mac(x, sk_AB) ) ]->
+  --[ Running( $B, $A, <'I', 'R', x> ), Send_B_4( mac(x, sk_AB) ) ]->
    [ Out( mac(x, sk_AB) ), St_B_5( $B, id, $A, sk_AB, sk_BA, x, y ) ]
 
   /*
   rule (modulo AC) B_4_Send:
      [ St_B_4( $B, id, $A, sk_AB, sk_BA, x, y ) ]
     --[
-    Running( $B, $A, <'A', 'B', x> ), Send_B_4( <x, senc(x, sk_AB)> )
+    Running( $B, $A, <'I', 'R', x> ), Send_B_4( <x, senc(x, sk_AB)> )
     ]->
      [
      Out( <x, senc(x, sk_AB)> ),
@@ -125,7 +125,7 @@ rule (modulo E) B_4_Send:
 rule (modulo E) A_4_Recv:
    [ In( mac(x, sk_AB) ), St_A_4( $A, id, $B, sk_AB, sk_BA, x, y ) ]
   --[
-  Honest( $A ), Honest( $B ), Commit( $A, $B, <'A', 'B', x> ),
+  Honest( $A ), Honest( $B ), Commit( $A, $B, <'I', 'R', x> ),
   Receive_A_4( mac(x, sk_AB) ), Finish( $A )
   ]->
    [ St_A_5( $A, id, $B, sk_AB, sk_BA, x, y ) ]
@@ -136,7 +136,7 @@ rule (modulo E) A_4_Recv:
      In( <x, senc(x, sk_AB)> ), St_A_4( $A, id, $B, sk_AB, sk_BA, x, y )
      ]
     --[
-    Honest( $A ), Honest( $B ), Commit( $A, $B, <'A', 'B', x> ),
+    Honest( $A ), Honest( $B ), Commit( $A, $B, <'I', 'R', x> ),
     Receive_A_4( <x, senc(x, sk_AB)> ), Finish( $A )
     ]->
      [ St_A_5( $A, id, $B, sk_AB, sk_BA, x, y ) ]
@@ -197,7 +197,19 @@ guarded formula characterizing all counter-examples:
   (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
 */
 simplify
-by solve( Commit( a, b, <'I', 'R', t> ) @ #i )
+solve( Commit( a, b, <'I', 'R', t> ) @ #i )
+  case A_4_Recv
+  solve( St_A_4( $A, id, $B, sk_AB, sk_BA, t, y ) ▶₁ #i )
+    case A_3_Send
+    solve( !KU( senc(~x, ~sk) ) @ #vk.2 )
+      case A_3_Send
+      solve( !KU( ~x ) @ #vk.2 )
+        case A_1_Send
+        SOLVED // trace found
+      qed
+    qed
+  qed
+qed
 
 lemma injectiveagreementINITIATOR:
   all-traces
@@ -221,7 +233,19 @@ guarded formula characterizing all counter-examples:
   (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
 */
 simplify
-by solve( Commit( a, b, <'I', 'R', t> ) @ #i )
+solve( Commit( a, b, <'I', 'R', t> ) @ #i )
+  case A_4_Recv
+  solve( St_A_4( $A, id, $B, sk_AB, sk_BA, t, y ) ▶₁ #i )
+    case A_3_Send
+    solve( !KU( senc(~x, ~sk) ) @ #vk.2 )
+      case A_3_Send
+      solve( !KU( ~x ) @ #vk.2 )
+        case A_1_Send
+        SOLVED // trace found
+      qed
+    qed
+  qed
+qed
 
 lemma noninjectiveagreementRESPONDER:
   all-traces
@@ -238,7 +262,25 @@ guarded formula characterizing all counter-examples:
   (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
 */
 simplify
-by solve( Commit( a, b, <'R', 'I', t> ) @ #i )
+solve( Commit( a, b, <'R', 'I', t> ) @ #i )
+  case B_3_Recv
+  solve( St_B_3( $B, id, $A, sk_AB, sk_BA, x, t ) ▶₁ #i )
+    case B_2_Send
+    solve( !KU( senc(~y, ~sk) ) @ #vk.2 )
+      case B_4_Send
+      solve( !KU( senc(~y.1, ~sk.1) ) @ #vk.6 )
+        case A_3_Send
+        solve( !KU( ~y ) @ #vk.3 )
+          case B_2_Send
+          solve( !KU( ~y.1 ) @ #vk.6 )
+            case B_2_Send
+            SOLVED // trace found
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
 
 lemma injectiveagreementRESPONDER:
   all-traces
@@ -262,7 +304,25 @@ guarded formula characterizing all counter-examples:
   (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
 */
 simplify
-by solve( Commit( a, b, <'R', 'I', t> ) @ #i )
+solve( Commit( a, b, <'R', 'I', t> ) @ #i )
+  case B_3_Recv
+  solve( St_B_3( $B, id, $A, sk_AB, sk_BA, x, t ) ▶₁ #i )
+    case B_2_Send
+    solve( !KU( senc(~y, ~sk) ) @ #vk.2 )
+      case B_4_Send
+      solve( !KU( senc(~y.1, ~sk.1) ) @ #vk.6 )
+        case A_3_Send
+        solve( !KU( ~y ) @ #vk.3 )
+          case B_2_Send
+          solve( !KU( ~y.1 ) @ #vk.6 )
+            case B_2_Send
+            SOLVED // trace found
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
 
 /* All well-formedness checks were successful. */
 
