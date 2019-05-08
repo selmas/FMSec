@@ -111,7 +111,6 @@ rule B_3_Recv:
 // B -> A: [A,x]Kab
 rule B_4_Send:
 	let 
-		Kab = kdf(sk_AB,x,y)
 		m3 = mac(<$A,x>, Kab)
 	in
 	[ St_B_4($B, id, $A, sk_AB, x, y, Kab) ] 
@@ -122,7 +121,6 @@ rule B_4_Send:
 
 rule A_4_Recv:
 	let 
-		Kab = kdf(sk_AB,x,y)
 		m4 = mac(<$A,x>, Kab)
 	in
 	[ In(m4)

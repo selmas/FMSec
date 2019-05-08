@@ -120,54 +120,46 @@ rule (modulo E) B_3_Recv:
   */
 
 rule (modulo E) B_4_Send:
-   [ St_B_4( $B, id, $A, sk_AB, x, y, kdf(sk_AB, x, y) ) ]
-  --[
-  Running( $B, $A, <'I', 'R', x> ),
-  Send_B_4( mac(<$A, x>, kdf(sk_AB, x, y)) )
+   [ St_B_4( $B, id, $A, sk_AB, x, y, Kab ) ]
+  --[ Running( $B, $A, <'I', 'R', x> ), Send_B_4( mac(<$A, x>, Kab) )
   ]->
-   [
-   Out( mac(<$A, x>, kdf(sk_AB, x, y)) ),
-   St_B_5( $B, id, $A, sk_AB, x, y, kdf(sk_AB, x, y) )
+   [ Out( mac(<$A, x>, Kab) ), St_B_5( $B, id, $A, sk_AB, x, y, Kab )
    ]
 
   /*
   rule (modulo AC) B_4_Send:
-     [ St_B_4( $B, id, $A, sk_AB, x, y, kdf(sk_AB, x, y) ) ]
+     [ St_B_4( $B, id, $A, sk_AB, x, y, Kab ) ]
     --[
     Running( $B, $A, <'I', 'R', x> ),
-    Send_B_4( <<$A, x>, senc(<$A, x>, kdf(sk_AB, x, y))> )
+    Send_B_4( <<$A, x>, senc(<$A, x>, Kab)> )
     ]->
      [
-     Out( <<$A, x>, senc(<$A, x>, kdf(sk_AB, x, y))> ),
-     St_B_5( $B, id, $A, sk_AB, x, y, kdf(sk_AB, x, y) )
+     Out( <<$A, x>, senc(<$A, x>, Kab)> ),
+     St_B_5( $B, id, $A, sk_AB, x, y, Kab )
      ]
   */
 
 rule (modulo E) A_4_Recv:
-   [
-   In( mac(<$A, x>, kdf(sk_AB, x, y)) ),
-   St_A_4( $A, id, $B, sk_AB, x, y, kdf(sk_AB, x, y) )
-   ]
+   [ In( mac(<$A, x>, Kab) ), St_A_4( $A, id, $B, sk_AB, x, y, Kab ) ]
   --[
-  Secret( $A, kdf(sk_AB, x, y) ), Honest( $A ), Honest( $B ),
-  Commit( $A, $B, <'I', 'R', x> ),
-  Receive_A_4( mac(<$A, x>, kdf(sk_AB, x, y)) ), Finish( $A )
+  Secret( $A, Kab ), Honest( $A ), Honest( $B ),
+  Commit( $A, $B, <'I', 'R', x> ), Receive_A_4( mac(<$A, x>, Kab) ),
+  Finish( $A )
   ]->
-   [ St_A_5( $A, id, $B, sk_AB, x, y, kdf(sk_AB, x, y) ) ]
+   [ St_A_5( $A, id, $B, sk_AB, x, y, Kab ) ]
 
   /*
   rule (modulo AC) A_4_Recv:
      [
-     In( <<$A, x>, senc(<$A, x>, kdf(sk_AB, x, y))> ),
-     St_A_4( $A, id, $B, sk_AB, x, y, kdf(sk_AB, x, y) )
+     In( <<$A, x>, senc(<$A, x>, Kab)> ),
+     St_A_4( $A, id, $B, sk_AB, x, y, Kab )
      ]
     --[
-    Secret( $A, kdf(sk_AB, x, y) ), Honest( $A ), Honest( $B ),
+    Secret( $A, Kab ), Honest( $A ), Honest( $B ),
     Commit( $A, $B, <'I', 'R', x> ),
-    Receive_A_4( <<$A, x>, senc(<$A, x>, kdf(sk_AB, x, y))> ),
-    Finish( $A )
+    Receive_A_4( <<$A, x>, senc(<$A, x>, Kab)> ), Finish( $A )
     ]->
-     [ St_A_5( $A, id, $B, sk_AB, x, y, kdf(sk_AB, x, y) ) ]
+     [ St_A_5( $A, id, $B, sk_AB, x, y, Kab ) ]
   */
 
 restriction onekeyperpair:
@@ -190,13 +182,11 @@ guarded formula characterizing all satisfying traces:
 simplify
 solve( Finish( A ) @ #i )
   case A_4_Recv
-  solve( St_A_4( $A, id, $B, sk_AB, x, y, kdf(sk_AB, x, y) ) ▶₁ #i )
+  solve( St_A_4( $A, id, $B, sk_AB, x, y, Kab ) ▶₁ #i )
     case A_3_Send
     solve( Finish( B.1 ) @ #j )
       case A_4_Recv
-      solve( St_A_4( $A.1, id.1, $B.1, sk_AB, x.1, y.1,
-                     kdf(sk_AB, x.1, y.1)
-             ) ▶₁ #j )
+      solve( St_A_4( $A.1, id.1, $B.1, sk_AB, x.1, y.1, Kab ) ▶₁ #j )
         case A_3_Send
         solve( !KU( senc(<$A, ~x>, kdf(~sk, ~x, y)) ) @ #vk.4 )
           case B_4_Send
@@ -245,7 +235,7 @@ guarded formula characterizing all counter-examples:
 simplify
 solve( Secret( A, x ) @ #i )
   case A_4_Recv
-  solve( St_A_4( $A, id, $B, sk_AB, x, y, kdf(sk_AB, x, y) ) ▶₁ #i )
+  solve( St_A_4( $A, id, $B, sk_AB, x, y, x.1 ) ▶₁ #i )
     case A_3_Send
     solve( !KU( kdf(~sk, ~x, y) ) @ #vk )
       case c_kdf
@@ -292,7 +282,7 @@ guarded formula characterizing all counter-examples:
 simplify
 solve( Commit( a, b, <'I', 'R', t> ) @ #i )
   case A_4_Recv
-  solve( St_A_4( $A, id, $B, sk_AB, t, y, kdf(sk_AB, t, y) ) ▶₁ #i )
+  solve( St_A_4( $A, id, $B, sk_AB, t, y, Kab ) ▶₁ #i )
     case A_3_Send
     solve( !KU( senc(<$A, ~x>, kdf(~sk, ~x, y)) ) @ #vk.4 )
       case A_3_Send
@@ -340,7 +330,7 @@ guarded formula characterizing all counter-examples:
 simplify
 solve( Commit( a, b, <'I', 'R', t> ) @ #i )
   case A_4_Recv
-  solve( St_A_4( $A, id, $B, sk_AB, t, y, kdf(sk_AB, t, y) ) ▶₁ #i )
+  solve( St_A_4( $A, id, $B, sk_AB, t, y, Kab ) ▶₁ #i )
     case A_3_Send
     solve( !KU( senc(<$A, ~x>, kdf(~sk, ~x, y)) ) @ #vk.4 )
       case A_3_Send
@@ -351,9 +341,7 @@ solve( Commit( a, b, <'I', 'R', t> ) @ #i )
         case case_1
         solve( Commit( a2, b2, <'I', 'R', ~x> ) @ #i2 )
           case A_4_Recv
-          solve( St_A_4( $A.1, id.1, $B.1, sk_AB, ~x, y.1,
-                         kdf(sk_AB, ~x, y.1)
-                 ) ▶₁ #i2 )
+          solve( St_A_4( $A.1, id.1, $B.1, sk_AB, ~x, y.1, Kab ) ▶₁ #i2 )
             case A_3_Send
             by contradiction /* cyclic */
           qed
@@ -362,9 +350,7 @@ solve( Commit( a, b, <'I', 'R', t> ) @ #i )
         case case_2
         solve( Commit( a2, b2, <'I', 'R', ~x> ) @ #i2 )
           case A_4_Recv
-          solve( St_A_4( $A.1, id.1, $B.1, sk_AB, ~x, y.1,
-                         kdf(sk_AB, ~x, y.1)
-                 ) ▶₁ #i2 )
+          solve( St_A_4( $A.1, id.1, $B.1, sk_AB, ~x, y.1, Kab ) ▶₁ #i2 )
             case A_3_Send
             by contradiction /* cyclic */
           qed
