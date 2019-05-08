@@ -1,0 +1,214 @@
+theory P5ab
+begin
+
+/*
+  Assignment 1.5: Introducing Diffie-Hellman: The PACE protocol
+
+	We derive the PACE protocol by replacing the nonces x and y by 
+	Diffie-Hellman half-keys g^x and g^y . A particularity of the 
+	PACE protocol is the choice of the generator g, which is defined 
+	by
+		g = map(s, p).
+
+	Here, s is the nonce from P4 and p is a public domain parameter 
+	that, together with the mapping function map, ensures that g is 
+	a suitable group generator.
+
+	We model map as a user-defined hash function (i.e., without 
+	equational properties). The parameter p is added as an additional 
+	plaintext component to the first message. Furthermore, the hashed 
+	Diffie-Hellman secret now replaces the previous session key:
+
+		Kab = h(g^xy).
+	
+
+	1. A -> B: g^x, (s)h(k(A,B), p
+	2. B -> A: g^y
+	3. A -> B: [B,g^y]Kab
+	4. B -> A: [A,g^x]Kab
+
+
+	The Goal is agreement of each role with the other role on both nonces x and y
+	and secrecy of the session key Kab.
+*/
+
+builtins: symmetric-encryption, hashing, diffie-hellman
+functions: mac/2, map/1
+equations: mac(m, k) = <m, senc(m, k)>
+
+rule Register:
+	[ Fr(~sk) ]
+	--[ Register($I, $R) ]-> 
+	[ !Lkt($I, $R, ~sk) ]
+
+rule Reveal_A:
+	[!Lkt($I, $R, ltk)]
+	--[Reveal($I)]->
+	[Out(ltk)]
+	
+rule Reveal_B:
+	[!Lkt($I, $R, ltk)]
+	--[Reveal($R)]->
+	[Out(ltk)]
+
+rule Init_A:	
+	[ Fr(~id)
+	, Fr(~s)
+	, !Lkt($A, $B, sk_AB)
+	] 
+	--[ Create($A, ~id, 'A') ]->
+	[ St_A_1($A, ~id, $B, sk_AB, ~s) ] 
+
+rule Init_B:
+	[ Fr(~id)
+	, !Lkt($A, $B, sk_AB)
+	] 
+	--[ Create($B, ~id, 'B') ]->
+	[ St_B_1($B, ~id, $A, sk_AB) ] 
+
+// A -> B: g^x,(s)h(k(A,B, p
+rule A_1_Send:
+	let
+		g = map(s,'p')
+		m1 = <g^~x, senc(s,h(sk_AB)), 'p'>
+	in
+	[ Fr(~x)
+	, St_A_1($A, id, $B, sk_AB, s) ]
+	--[ Send_A_1(m1) ]->
+	[ Out(m1)
+	, St_A_2($A, id, $B, sk_AB, ~x, s, 'p') 
+	]
+
+rule B_1_Recv:
+	let
+		m1 = <gx, senc(s,h(sk_AB)), 'p'>
+	in
+	[ In(m1)
+	, St_B_1($B, id, $A, sk_AB) ]
+	--[ Receive_B_1(m1) ]->
+	[ St_B_2($B, id, $A, sk_AB, gx, s, 'p') ]
+
+// B -> A: g^y
+rule B_2_Send:
+	let
+		g = map(s,'p')
+		gy = g^~y
+	in
+	[ Fr(~y)
+	, St_B_2($B, id, $A, sk_AB, gx, s, 'p') ]
+	--[ Send_B_2(gy) ]->
+	[ Out(gy)	
+	, St_B_3($B, id, $A, sk_AB, gx, s, 'p', ~y) 
+	]
+
+rule A_2_Recv:
+	[ In(gy)
+	, St_A_2($A, id, $B, sk_AB, x, s, 'p') ]
+	--[ Receive_A_2(gy) ]->
+	[ St_A_3($A, id, $B, sk_AB, x, s, 'p', gy) ]
+
+// A -> B: [B,y]Kab
+rule A_3_Send:
+	let 
+		Kab = h((gy)^x)
+		m1 = mac(<$B,gy>, Kab)
+	in
+	[ St_A_3($A, id, $B, sk_AB, x, s, 'p', gy) ] 
+	--[ Running($A, $B, <'R', 'I', gy>)
+	, Send_A_3(m1) ]->
+	[ Out(m1)
+	, St_A_4($A, id, $B, sk_AB, x, s, 'p', gy, Kab) ] 
+
+rule B_3_Recv:
+	let 
+		g = map(s,'p')
+		Kab = h((gx)^y)
+		m2 = mac(<$B,g^y>, Kab)
+	in
+	[ In(m2)
+	, St_B_3($B, id, $A, sk_AB, gx, s, 'p', y) ]
+	--[ Secret($B, Kab)
+	, Honest($A)
+	, Honest($B)
+	, Commit($B, $A, <'R', 'I', g^y>)
+	, Receive_B_3(m2)
+	, Finish($B) ]->
+	[ St_B_4($B, id, $A, sk_AB, gx, s, 'p', y, Kab) ]
+
+// B -> A: [A,x]Kab
+rule B_4_Send:
+	let 
+		m3 = mac(<$A,gx>, Kab)
+	in
+	[ St_B_4($B, id, $A, sk_AB, gx, s, 'p', y, Kab) ] 
+	--[ Running($B, $A, <'I', 'R', gx>)
+	, Send_B_4(m3) ]->
+	[ Out(m3)
+	, St_B_5($B, id, $A, sk_AB, gx, s, 'p', y, Kab) ] 
+
+rule A_4_Recv:
+	let 
+		g = map(s,'p')
+		m4 = mac(<$A,g^x>, Kab)
+	in
+	[ In(m4)
+	, St_A_4($A, id, $B, sk_AB, x, s, 'p', gy, Kab) ]
+	--[ Secret($A, Kab)
+	, Honest($A)
+	, Honest($B)
+	, Commit($A, $B, <'I', 'R', g^x>)
+	, Receive_A_4(m4)
+	, Finish($A) ]->
+	[ St_A_5($A, id, $B, sk_AB, x, s, 'p', gy, Kab) ]
+
+//restriction onekeyperpair:
+//  "All A B #i #j. Register(A, B)@i & Register(A, B)@j ==> #i = #j"
+
+restriction nokeywithyourself:
+  "All A B #i. Register(A, B)@i ==> not (A = B)"
+
+// This lemma gets verified
+lemma executable:
+  exists-trace
+    "Ex A B #i #j. Finish(A)@i & Finish(B)@j & not (A = B)"
+
+// This lemma gets verified
+lemma secrecy:
+  "All A x #i. 
+    Secret(A,x) @i ==> 
+    not (Ex #j. K(x)@j)
+        | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+// This lemma gets verified
+lemma noninjectiveagreementINITIATOR:
+  "All a b t #i. 
+    Commit(a,b,<'I','R',t>) @i
+    ==> (Ex #j. Running(b,a,<'I','R',t>) @j)
+        | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+// This lemma gets verified
+lemma injectiveagreementINITIATOR:
+  "All a b t #i. 
+    Commit(a,b,<'I','R',t>) @i
+    ==> (Ex #j. Running(b,a,<'I','R',t>) @j 
+        & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
+                           & not (#i2 = #i)))
+              | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+// This lemma gets verified
+lemma noninjectiveagreementRESPONDER:
+  "All a b t #i. 
+    Commit(a,b,<'R','I',t>) @i
+    ==> (Ex #j. Running(b,a,<'R','I',t>) @j)
+        | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+lemma injectiveagreementRESPONDER:
+  "All a b t #i. 
+    Commit(a,b,<'R','I',t>) @i
+    ==> (Ex #j. Running(b,a,<'R','I',t>) @j 
+              & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
+                                 & not (#i2 = #i)))
+              | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+
+end
