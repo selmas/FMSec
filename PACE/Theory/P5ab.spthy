@@ -161,9 +161,6 @@ rule A_4_Recv:
 	, Finish($A) ]->
 	[ St_A_5($A, id, $B, sk_AB, x, s, 'p', gy, Kab) ]
 
-//restriction onekeyperpair:
-//  "All A B #i #j. Register(A, B)@i & Register(A, B)@j ==> #i = #j"
-
 // This lemma gets verified
 lemma executable:
   exists-trace
@@ -175,6 +172,13 @@ lemma secrecy:
     Secret(A,x) @i ==> 
     not (Ex #j. K(x)@j)
         | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+
+// This lemma gets verified
+lemma secrecy_PFS:
+  "All A x #i. 
+    Secret(A,x) @i ==> 
+    not (Ex #j. K(x)@j)
+        | (Ex X #r. Reveal(X)@r & Honest(X) @i & r < i)"
 
 // This lemma gets verified
 lemma noninjectiveagreementINITIATOR:
@@ -199,6 +203,7 @@ lemma noninjectiveagreementRESPONDER:
     ==> (Ex #j. Running(b,a,<'R','I',t>) @j)
         | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
 
+// This lemma gets verified
 lemma injectiveagreementRESPONDER:
   "All a b t #i. 
     Commit(a,b,<'R','I',t>) @i
