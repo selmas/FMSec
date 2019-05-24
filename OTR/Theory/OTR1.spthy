@@ -1,11 +1,11 @@
-theory OTR2
+theory OTR1
 begin
 
 /*
-	Assignment 2.2: Authentication Failure
+	Assignment 2.1: Modeling the original OTR Key Exchange
 
-	1. A -> B: g^x, sign{'1', g^x}(skA), pkA
-	2. B -> A: g^y, sign{'2', g^y}(skB), pkB
+	1. A -> B: sign{'1', g^x}(skA), pkA
+	2. B -> A: sign{'2', g^y}(skB), pkB
 
 */
 
@@ -108,32 +108,5 @@ rule A_2_receive:
 	, Commit($A, $B, <'I', 'R', Y^~x>)	]->
 	[ St_A_3($A, ~id, $B, skA, pkB, K) ]
 
-restriction onekeypername:
-	"All A #A #j. Register(A)@A & Register(A)@j ==> #A = #j"
-
-restriction equality:
-	"All k1 k2 #i. Equal(k1, k2)@i ==> k1 = k2"
-
-restriction oneinitiator:
-	"All A B id1 id2 #i #j. Create_I(A, id1, 'initiator')@i & Create_I(B, id2, 'initiator')@j ==> (A = B) & (id1 = id2)"
-
-restriction unique:
-	"All id1 id2 key #i #j. Unique(id1, key)@i & Unique(id2, key)@j ==> (id1 = id2)"
-
-// This lemma gets verified
-lemma executability:
-	exists-trace
-		"Ex A B K #i #j. 
-			Secret(A, K)@i & Secret(B, K)@j & not (A = B) &
-			not (Ex B #k. Reveal(B)@k)"
-
-lemma injectiveagreementINITIATOR:
-	"All a b t #i.
-		Commit(a,b,<'I','R',t>) @i
-		==> (Ex #j. Running(b,a,<'I','R',t>) @j
-			& j < i
-			& not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
-				& not (#i2 = #i)))
-			| (Ex X #r. Reveal(X)@r & Honest(X) @i)"
 
 end
