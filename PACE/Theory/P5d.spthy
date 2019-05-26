@@ -70,22 +70,22 @@ rule Init_B:
 rule A_1_Send:
 	let
 		g = map(s,'p')
-		m1 = <g^~x, senc(s,h(sk_AB)), 'p'>
+		m = <g^~x, senc(s,h(sk_AB)), 'p'>
 	in
 	[ Fr(~x)
 	, St_A_1($A, id, $B, sk_AB, s) ]
-	--[ Send_A_1(m1) ]->
-	[ Out(m1)
+	--[ Send_A_1(m) ]->
+	[ Out(m)
 	, St_A_2($A, id, $B, sk_AB, ~x, s, 'p') 
 	]
 
 rule B_1_Recv:
 	let
-		m1 = <gx, senc(s,h(sk_AB)), 'p'>
+		m = <gx, senc(s,h(sk_AB)), 'p'>
 	in
-	[ In(m1)
+	[ In(m)
 	, St_B_1($B, id, $A, sk_AB) ]
-	--[ Receive_B_1(m1) ]->
+	--[ Receive_B_1(m) ]->
 	[ St_B_2($B, id, $A, sk_AB, gx, s, 'p') ]
 
 // B -> A: g^y
@@ -111,55 +111,63 @@ rule A_2_Recv:
 rule A_3_Send:
 	let 
 		Kab = h((gy)^x)
-		m1 = mac(gy, Kab)
+		m = mac(gy, Kab)
 	in
 	[ St_A_3($A, id, $B, sk_AB, x, s, 'p', gy) ] 
 	--[ Running($A, $B, <'R', 'I', gy>)
-	, Send_A_3(m1) ]->
-	[ Out(m1)
+	, Send_A_3(m) ]->
+	[ Out(m)
 	, St_A_4($A, id, $B, sk_AB, x, s, 'p', gy, Kab) ] 
 
 rule B_3_Recv:
 	let 
 		g = map(s,'p')
 		Kab = h((gx)^y)
-		m2 = mac(g^y, Kab)
+		m = mac(g^y, Kab)
 	in
-	[ In(m2)
+	[ In(m)
 	, St_B_3($B, id, $A, sk_AB, gx, s, 'p', y) ]
 	--[ Secret($B, Kab)
 	, Honest($A)
 	, Honest($B)
 	, Commit($B, $A, <'R', 'I', g^y>)
-	, Receive_B_3(m2)
+	, Receive_B_3(m)
 	, Finish($B) ]->
 	[ St_B_4($B, id, $A, sk_AB, gx, s, 'p', y, Kab) ]
 
 // B -> A: [A,x]Kab
 rule B_4_Send:
 	let 
-		m3 = mac(gx, Kab)
+		m = mac(gx, Kab)
 	in
 	[ St_B_4($B, id, $A, sk_AB, gx, s, 'p', y, Kab) ] 
 	--[ Running($B, $A, <'I', 'R', gx>)
-	, Send_B_4(m3) ]->
-	[ Out(m3)
+	, Send_B_4(m) ]->
+	[ Out(m)
 	, St_B_5($B, id, $A, sk_AB, gx, s, 'p', y, Kab) ] 
 
 rule A_4_Recv:
 	let 
 		g = map(s,'p')
-		m4 = mac(g^x, Kab)
+		m = mac(g^x, Kab)
 	in
-	[ In(m4)
+	[ In(m)
 	, St_A_4($A, id, $B, sk_AB, x, s, 'p', gy, Kab) ]
 	--[ Secret($A, Kab)
 	, Honest($A)
 	, Honest($B)
 	, Commit($A, $B, <'I', 'R', g^x>)
-	, Receive_A_4(m4)
+	, Receive_A_4(m)
 	, Finish($A) ]->
 	[ St_A_5($A, id, $B, sk_AB, x, s, 'p', gy, Kab) ]
+
+restriction differenthalfkeyINITIATOR:
+  "All gx gy enc_s p #i #j. Send_A_1(<gx, enc_s, p>)@i & Receive_A_2(gy)@j 
+  	==> not( gx = gy)"
+
+restriction differenthalfkeyRESPONDER:
+  "All gx gy enc_s p #i #j. Receive_B_1(<gx, enc_s, p>)@i & Send_B_2(gy)@j
+  	==> not( gx = gy)"
 
 // This lemma gets verified
 lemma executable:

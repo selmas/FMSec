@@ -16,12 +16,6 @@ builtins: symmetric-encryption
 functions: mac/2
 equations: mac(m, k) = <m, senc(m, k)>
 
-/*
-	Questions:
-		commit on x or on mac
-		construct mac function or simply send encryption
-*/
-
 rule Register:
 	[ Fr(~sk) ]
 	--[ Register($I, $R) ]-> 
