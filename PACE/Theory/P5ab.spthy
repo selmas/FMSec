@@ -22,13 +22,13 @@ begin
 		Kab = h(g^xy).
 	
 
-	1. A -> B: g^x, (s)h(k(A,B), p
+	1. A -> B: g^x, (s)h(k(A,B)), p
 	2. B -> A: g^y
-	3. A -> B: [B,g^y]Kab
-	4. B -> A: [A,g^x]Kab
+	3. A -> B: [A,B,g^y]Kab
+	4. B -> A: [B,A,g^x]Kab
 
 
-	The Goal is agreement of each role with the other role on both nonces x and y
+	The goal is agreement of each role with the other role on both nonces x and y
 	and secrecy of the session key Kab.
 */
 
@@ -66,7 +66,7 @@ rule Init_B:
 	--[ Create($B, ~id, 'B') ]->
 	[ St_B_1($B, ~id, $A, sk_AB) ] 
 
-// A -> B: g^x,(s)h(k(A,B, p
+// A -> B: g^x,(s)h(k(A,B)), p
 rule A_1_Send:
 	let
 		g = map(s,'p')
@@ -107,14 +107,15 @@ rule A_2_Recv:
 	--[ Receive_A_2(gy) ]->
 	[ St_A_3($A, id, $B, sk_AB, x, s, 'p', gy) ]
 
-// A -> B: [B,y]Kab
+// A -> B: [A,B,g^y]Kab
 rule A_3_Send:
 	let 
+		g = map(s,'p')
 		Kab = h((gy)^x)
-		m1 = mac(<'B',gy>, Kab)
+		m1 = mac(<'A','B',gy>, Kab)
 	in
 	[ St_A_3($A, id, $B, sk_AB, x, s, 'p', gy) ] 
-	--[ Running($A, $B, <'R', 'I', gy>)
+	--[ Running($A, $B, <'R', 'I', <g^x,gy,Kab>>)
 	, Send_A_3(m1) ]->
 	[ Out(m1)
 	, St_A_4($A, id, $B, sk_AB, x, s, 'p', gy, Kab) ] 
@@ -123,25 +124,26 @@ rule B_3_Recv:
 	let 
 		g = map(s,'p')
 		Kab = h((gx)^y)
-		m2 = mac(<'B',g^y>, Kab)
+		m2 = mac(<'A','B',g^y>, Kab)
 	in
 	[ In(m2)
 	, St_B_3($B, id, $A, sk_AB, gx, s, 'p', y) ]
 	--[ Secret($B, Kab)
 	, Honest($A)
 	, Honest($B)
-	, Commit($B, $A, <'R', 'I', g^y>)
+	, Commit($B, $A, <'R', 'I', <gx,g^y,Kab>>)
 	, Receive_B_3(m2)
 	, Finish($B) ]->
 	[ St_B_4($B, id, $A, sk_AB, gx, s, 'p', y, Kab) ]
 
-// B -> A: [A,x]Kab
+// B -> A: [B,A,g^x]Kab
 rule B_4_Send:
 	let 
-		m3 = mac(<'A',gx>, Kab)
+		g = map(s,'p')
+		m3 = mac(<'B','A',gx>, Kab)
 	in
 	[ St_B_4($B, id, $A, sk_AB, gx, s, 'p', y, Kab) ] 
-	--[ Running($B, $A, <'I', 'R', gx>)
+	--[ Running($B, $A, <'I', 'R', <gx,g^y,Kab>>)
 	, Send_B_4(m3) ]->
 	[ Out(m3)
 	, St_B_5($B, id, $A, sk_AB, gx, s, 'p', y, Kab) ] 
@@ -149,14 +151,14 @@ rule B_4_Send:
 rule A_4_Recv:
 	let 
 		g = map(s,'p')
-		m4 = mac(<'A',g^x>, Kab)
+		m4 = mac(<'B','A',g^x>, Kab)
 	in
 	[ In(m4)
 	, St_A_4($A, id, $B, sk_AB, x, s, 'p', gy, Kab) ]
 	--[ Secret($A, Kab)
 	, Honest($A)
 	, Honest($B)
-	, Commit($A, $B, <'I', 'R', g^x>)
+	, Commit($A, $B, <'I', 'R', <g^x,gy,Kab>>)
 	, Receive_A_4(m4)
 	, Finish($A) ]->
 	[ St_A_5($A, id, $B, sk_AB, x, s, 'p', gy, Kab) ]
@@ -164,7 +166,9 @@ rule A_4_Recv:
 // This lemma gets verified
 lemma executable:
   exists-trace
-    "Ex A B #i #j. Finish(A)@i & Finish(B)@j & not (A = B)"
+    "Ex A B #i #j. Finish(A)@i & Finish(B)@j & not (A = B) & not (Ex X #r. Reveal(X)@r)
+    	& (All A B id1 id2 #i #j. Create(A, id1, 'A')@i & Create(B, id2, 'A')@j ==> (A = B) & (id1 = id2))
+    	& (All A B id1 id2 #i #j. Create(A, id1, 'B')@i & Create(B, id2, 'B')@j ==> (A = B) & (id1 = id2))"
 
 // This lemma gets verified
 lemma secrecy:
@@ -211,6 +215,5 @@ lemma injectiveagreementRESPONDER:
               & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
                                  & not (#i2 = #i)))
               | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
-
 
 end

@@ -100,7 +100,7 @@ rule B_3_Recv:
 	, Honest($B)
 	, Commit($B, $A, <'R', 'I', y>)
 	, Receive_B_3(m2)
-	, Finish($B) ]->
+	]->
 	[ St_B_4($B, id, $A, sk_AB, sk_BA, x, y) ]
 
 // B -> A: [x]k(A,B)
@@ -109,7 +109,9 @@ rule B_4_Send:
 	in
 	[ St_B_4($B, id, $A, sk_AB, sk_BA, x, y) ] 
 	--[ Running($B, $A, <'I', 'R', x>)
-	, Send_B_4(m3) ]->
+	, Send_B_4(m3)
+	, Finish($B)  
+	]->
 	[ Out(m3)
 	, St_B_5($B, id, $A, sk_AB, sk_BA, x, y) ] 
 
@@ -131,16 +133,18 @@ restriction onekeyperpair:
 // This lemma gets verified
 lemma executable:
   exists-trace
-    "Ex A B #i #j. Finish(A)@i & Finish(B)@j & not (A = B)"
+    "Ex A B #i #j. Finish(A)@i & Finish(B)@j & not (A = B) & not (Ex X #r. Reveal(X)@r)
+    	& (All A B id1 id2 #i #j. Create(A, id1, 'A')@i & Create(B, id2, 'A')@j ==> (A = B) & (id1 = id2))
+    	& (All A B id1 id2 #i #j. Create(A, id1, 'B')@i & Create(B, id2, 'B')@j ==> (A = B) & (id1 = id2))"
 
-// This lemma gets verified
+// This lemma does not hold
 lemma noninjectiveagreementINITIATOR:
   "All a b t #i. 
     Commit(a,b,<'I','R',t>) @i
     ==> (Ex #j. Running(b,a,<'I','R',t>) @j)
         | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
 
-// This lemma gets verified
+// This lemma does not hold
 lemma injectiveagreementINITIATOR:
   "All a b t #i. 
     Commit(a,b,<'I','R',t>) @i
@@ -149,13 +153,14 @@ lemma injectiveagreementINITIATOR:
                            & not (#i2 = #i)))
               | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
 
-// This lemma gets verified
+// This lemma does not hold
 lemma noninjectiveagreementRESPONDER:
   "All a b t #i. 
     Commit(a,b,<'R','I',t>) @i
     ==> (Ex #j. Running(b,a,<'R','I',t>) @j)
         | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
 
+// This lemma does not hold
 lemma injectiveagreementRESPONDER:
   "All a b t #i. 
     Commit(a,b,<'R','I',t>) @i
@@ -163,6 +168,5 @@ lemma injectiveagreementRESPONDER:
               & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
                                  & not (#i2 = #i)))
               | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
-
-
+              
 end

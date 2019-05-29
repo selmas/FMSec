@@ -9,12 +9,12 @@ begin
 
 	1. A -> B: x
 	2. B -> A: y
-    3. A -> B: [A,y]k(B, A)
-    4. B -> A: [B,x]k(A, B)
+    3. A -> B: [A,B,y,x]k(B, A)
+    4. B -> A: [B,A,x,y]k(A, B)
 
 
   In order to reach agreement of each role with the other role on both nonces x and y
-  the sender needs to be included in the maced message to prevent a Man-in-the-Middle attack.
+  the identities of the agents need to be included in the maced message to prevent a Man-in-the-Middle attack.
 */
 
 builtins: symmetric-encryption
@@ -82,48 +82,51 @@ rule A_2_Recv:
 	--[ Receive_A_2(y) ]->
 	[ St_A_3($A, id, $B, sk_AB, sk_BA, x, y) ]
 
-// A -> B: [A,y]k(B,A)
+// A -> B: [A,B,y,x]k(B,A)
 rule A_3_Send:
-	let m1 = mac(<$A,y>, sk_BA)
+	let m1 = mac(<'A','B',y,x>, sk_BA)
 	in
 	[ St_A_3($A, id, $B, sk_AB, sk_BA, x, y) ] 
-	--[ Running($A, $B, <'R', 'I', y>)
+	--[ Running($A, $B, <'R', 'I', <y,x>>)
 	, Send_A_3(m1) ]->
 	[ Out(m1)
 	, St_A_4($A, id, $B, sk_AB, sk_BA, x, y) ] 
 
 rule B_3_Recv:
-	let m2 = mac(<$A,y>, sk_BA)
+	let m2 = mac(<'A','B',y,x>, sk_BA)
 	in
 	[ In(m2)
 	, St_B_3($B, id, $A, sk_AB, sk_BA, x, y) ]
 	--[ Honest($A)
 	, Honest($B)
-	, Commit($B, $A, <'R', 'I', y>)
+	, Commit($B, $A, <'R', 'I', <y,x>>)
 	, Receive_B_3(m2)
-	, Finish($B) ]->
+	]->
 	[ St_B_4($B, id, $A, sk_AB, sk_BA, x, y) ]
 
-// B -> A: [B,x]k(A,B)
+// B -> A: [B,A,x,y]k(A,B)
 rule B_4_Send:
-	let m3 = mac(<x,$B>, sk_AB)
+	let m3 = mac(<'B','A',x,y>, sk_AB)
 	in
 	[ St_B_4($B, id, $A, sk_AB, sk_BA, x, y) ] 
-	--[ Running($B, $A, <'I', 'R', x>)
-	, Send_B_4(m3) ]->
+	--[ Running($B, $A, <'I', 'R', <x,y>>)
+	, Send_B_4(m3)
+	, Finish($B)
+	]->
 	[ Out(m3)
 	, St_B_5($B, id, $A, sk_AB, sk_BA, x, y) ] 
 
 rule A_4_Recv:
-	let m4 = mac(<x,$B>, sk_AB)
+	let m4 = mac(<'B','A',x,y>, sk_AB)
 	in
 	[ In(m4)
 	, St_A_4($A, id, $B, sk_AB, sk_BA, x, y) ]
 	--[ Honest($A)
 	, Honest($B)
-	, Commit($A, $B, <'I', 'R', x>)
+	, Commit($A, $B, <'I', 'R', <x,y>>)
 	, Receive_A_4(m4)
-	, Finish($A) ]->
+	, Finish($A)
+	]->
 	[ St_A_5($A, id, $B, sk_AB, sk_BA, x, y) ]
 
 restriction onekeyperpair:
@@ -132,14 +135,9 @@ restriction onekeyperpair:
 // This lemma gets verified
 lemma executable:
   exists-trace
-    "Ex A B #i #j. Finish(A)@i & Finish(B)@j & not (A = B)"
-
-// This lemma gets verified
-lemma noninjectiveagreementINITIATOR:
-  "All a b t #i. 
-    Commit(a,b,<'I','R',t>) @i
-    ==> (Ex #j. Running(b,a,<'I','R',t>) @j)
-        | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
+    "Ex A B #i #j. Finish(A)@i & Finish(B)@j & not (A = B) & not (Ex X #r. Reveal(X)@r)
+    	& (All A B id1 id2 #i #j. Create(A, id1, 'A')@i & Create(B, id2, 'A')@j ==> (A = B) & (id1 = id2))
+    	& (All A B id1 id2 #i #j. Create(A, id1, 'B')@i & Create(B, id2, 'B')@j ==> (A = B) & (id1 = id2))"
 
 // This lemma gets verified
 lemma injectiveagreementINITIATOR:
@@ -151,12 +149,6 @@ lemma injectiveagreementINITIATOR:
               | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
 
 // This lemma gets verified
-lemma noninjectiveagreementRESPONDER:
-  "All a b t #i. 
-    Commit(a,b,<'R','I',t>) @i
-    ==> (Ex #j. Running(b,a,<'R','I',t>) @j)
-        | (Ex X #r. Reveal(X)@r & Honest(X) @i)"
-
 lemma injectiveagreementRESPONDER:
   "All a b t #i. 
     Commit(a,b,<'R','I',t>) @i
