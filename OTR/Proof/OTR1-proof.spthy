@@ -1,0 +1,314 @@
+theory OTR1 begin
+
+// Function signature and definition of the equational theory E
+
+builtins: diffie-hellman
+functions: fst/1, h/1, pair/2, pk/1, sign/2, snd/1, true/0,
+           verify/3
+equations:
+    fst(<x.1, x.2>) = x.1,
+    snd(<x.1, x.2>) = x.2,
+    verify(sign(x.1, x.2), x.1, pk(x.2)) = true
+
+
+
+rule (modulo E) Register_pk:
+   [ Fr( ~skA ) ]
+  --[ Register( $A ) ]->
+   [ !Ltk( $A, ~skA ), !Pk( $A, pk(~skA) ), Out( pk(~skA) ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Reveal_ltk:
+   [ !Ltk( A, skA ) ] --[ Reveal( A ) ]-> [ Out( skA ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Init_Initiator:
+   [ Fr( ~id ), !Ltk( $A, skA ), !Pk( $B, pkB ) ]
+  --[ Create_I( $A, ~id, 'initiator' ) ]->
+   [ St_A_1( $A, ~id, $B, skA, pkB ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Init_Responder:
+   [ Fr( ~id ), !Ltk( $B, skB ), !Pk( $A, pkA ) ]
+  --[ Create_R( $B, ~id, 'responder' ) ]->
+   [ St_B_1( $B, ~id, $A, skB, pkA ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A_1_Send:
+   [ St_A_1( $A, ~id, $B, skA, pkB ), Fr( ~x ) ]
+  --[
+  Send( $A, <'g'^~x, sign(<'1', 'g'^~x>, skA), pk(skA)> ),
+  Unique( ~id, skA )
+  ]->
+   [
+   St_A_2( $A, ~id, $B, skA, pkB, ~x ),
+   Out( <'g'^~x, sign(<'1', 'g'^~x>, skA), pk(skA)> )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) B_1_receive:
+   [
+   St_B_1( $B, ~id, $A, skB, pkA ),
+   In( <X, sign(<'1', X>, skA), pkA> )
+   ]
+  --[
+  Receive( $B, <X, sign(<'1', X>, skA), pkA> ), Unique( ~id, skB ),
+  Equal( verify(sign(<'1', X>, skA), <'1', X>, pkA), true )
+  ]->
+   [ St_B_2( $B, ~id, $A, skB, pkA, X ) ]
+
+  /*
+  rule (modulo AC) B_1_receive:
+     [
+     St_B_1( $B, ~id, $A, skB, pkA ),
+     In( <X, sign(<'1', X>, skA), pkA> )
+     ]
+    --[
+    Receive( $B, <X, sign(<'1', X>, skA), pkA> ), Unique( ~id, skB ),
+    Equal( z, true )
+    ]->
+     [ St_B_2( $B, ~id, $A, skB, pkA, X ) ]
+    variants (modulo AC)
+    1. X     = X.11
+       pkA   = pkA.12
+       skA   = skA.13
+       z     = verify(sign(<'1', X.11>, skA.13), <'1', X.11>, pkA.12)
+    
+    2. pkA   = pk(skA.11)
+       skA   = skA.11
+       z     = true
+  */
+
+rule (modulo E) B_2_Send:
+   [ St_B_2( $B, ~id, $A, skB, pkA, X ), Fr( ~y ) ]
+  --[
+  Send( $B, <'g'^~y, sign(<'2', 'g'^~y>, skB), pk(skB)> ),
+  Secret( $B, h(X^~y) ), Unique( ~id, skB ), Honest( $A ),
+  Honest( $B ), Running( $B, $A, <'I', 'R', X^~y> )
+  ]->
+   [
+   St_B_3( $B, ~id, $A, skB, pkA, h(X^~y) ),
+   Out( <'g'^~y, sign(<'2', 'g'^~y>, skB), pk(skB)> )
+   ]
+
+  /*
+  rule (modulo AC) B_2_Send:
+     [ St_B_2( $B, ~id, $A, skB, pkA, X ), Fr( ~y ) ]
+    --[
+    Send( $B, <'g'^~y, sign(<'2', 'g'^~y>, skB), pk(skB)> ),
+    Secret( $B, h(z) ), Unique( ~id, skB ), Honest( $A ), Honest( $B ),
+    Running( $B, $A, <'I', 'R', z> )
+    ]->
+     [
+     St_B_3( $B, ~id, $A, skB, pkA, h(z) ),
+     Out( <'g'^~y, sign(<'2', 'g'^~y>, skB), pk(skB)> )
+     ]
+    variants (modulo AC)
+    1. ~y    = ~y.11
+       X     = X.12
+       z     = X.12^~y.11
+    
+    2. ~y    = ~y.14
+       X     = z.18^inv(~y.14)
+       z     = z.18
+    
+    3. ~y    = ~y.77
+       X     = x.148^x.149
+       z     = x.148^(~y.77*x.149)
+    
+    4. ~y    = ~y.78
+       X     = x.150^inv((~y.78*x.151))
+       z     = x.150^inv(x.151)
+    
+    5. ~y    = ~y.78
+       X     = x.150^(x.151*inv(~y.78))
+       z     = x.150^x.151
+    
+    6. ~y    = ~y.79
+       X     = x.151^(x.152*inv((~y.79*x.153)))
+       z     = x.151^(x.152*inv(x.153))
+  */
+
+rule (modulo E) A_2_receive:
+   [
+   St_A_2( $A, ~id, $B, skA, pkB, ~x ),
+   In( <Y, sign(<'2', Y>, skB), pkB> )
+   ]
+  --[
+  Receive( $A, <Y, sign(<'2', Y>, skB), pkB> ),
+  Secret( $A, h(Y^~x) ), Unique( ~id, skA ), Honest( $A ),
+  Honest( $B ),
+  Equal( verify(sign(<'2', Y>, skB), <'2', Y>, pkB), true ),
+  Commit( $A, $B, <'I', 'R', Y^~x> )
+  ]->
+   [ St_A_3( $A, ~id, $B, skA, pkB, h(Y^~x) ) ]
+
+  /*
+  rule (modulo AC) A_2_receive:
+     [
+     St_A_2( $A, ~id, $B, skA, pkB, ~x ),
+     In( <Y, sign(<'2', Y>, skB), pkB> )
+     ]
+    --[
+    Receive( $A, <Y, sign(<'2', Y>, skB), pkB> ), Secret( $A, h(z) ),
+    Unique( ~id, skA ), Honest( $A ), Honest( $B ), Equal( z.1, true ),
+    Commit( $A, $B, <'I', 'R', z> )
+    ]->
+     [ St_A_3( $A, ~id, $B, skA, pkB, h(z) ) ]
+    variants (modulo AC)
+     1. ~x    = ~x.17
+        Y     = Y.18
+        pkB   = pkB.19
+        skB   = skB.21
+        z     = Y.18^~x.17
+        z.1   = verify(sign(<'2', Y.18>, skB.21), <'2', Y.18>, pkB.19)
+    
+     2. ~x    = ~x.17
+        Y     = Y.18
+        pkB   = pk(skB.21)
+        skB   = skB.21
+        z     = Y.18^~x.17
+        z.1   = true
+    
+     3. ~x    = ~x.19
+        Y     = z.25^inv(~x.19)
+        pkB   = pkB.21
+        skB   = skB.23
+        z     = z.25
+        z.1   = verify(sign(<'2', z.25^inv(~x.19)>, skB.23),
+                       <'2', z.25^inv(~x.19)>, pkB.21)
+    
+     4. ~x    = ~x.19
+        Y     = z.25^inv(~x.19)
+        pkB   = pk(skB.23)
+        skB   = skB.23
+        z     = z.25
+        z.1   = true
+    
+     5. ~x    = ~x.34
+        Y     = x.62^x.63
+        pkB   = pkB.36
+        skB   = skB.38
+        z     = x.62^(~x.34*x.63)
+        z.1   = verify(sign(<'2', x.62^x.63>, skB.38), <'2', x.62^x.63>,
+                       pkB.36)
+    
+     6. ~x    = ~x.34
+        Y     = x.62^x.63
+        pkB   = pk(skB.38)
+        skB   = skB.38
+        z     = x.62^(~x.34*x.63)
+        z.1   = true
+    
+     7. ~x    = ~x.35
+        Y     = x.64^inv((~x.35*x.65))
+        pkB   = pkB.37
+        skB   = skB.39
+        z     = x.64^inv(x.65)
+        z.1   = verify(sign(<'2', x.64^inv((~x.35*x.65))>, skB.39),
+                       <'2', x.64^inv((~x.35*x.65))>, pkB.37)
+    
+     8. ~x    = ~x.35
+        Y     = x.64^inv((~x.35*x.65))
+        pkB   = pk(skB.39)
+        skB   = skB.39
+        z     = x.64^inv(x.65)
+        z.1   = true
+    
+     9. ~x    = ~x.35
+        Y     = x.64^(x.65*inv(~x.35))
+        pkB   = pkB.37
+        skB   = skB.39
+        z     = x.64^x.65
+        z.1   = verify(sign(<'2', x.64^(x.65*inv(~x.35))>, skB.39),
+                       <'2', x.64^(x.65*inv(~x.35))>, pkB.37)
+    
+    10. ~x    = ~x.35
+        Y     = x.64^(x.65*inv(~x.35))
+        pkB   = pk(skB.39)
+        skB   = skB.39
+        z     = x.64^x.65
+        z.1   = true
+    
+    11. ~x    = ~x.36
+        Y     = x.65^(x.66*inv((~x.36*x.67)))
+        pkB   = pkB.38
+        skB   = skB.40
+        z     = x.65^(x.66*inv(x.67))
+        z.1   = verify(sign(<'2', x.65^(x.66*inv((~x.36*x.67)))>, skB.40),
+                       <'2', x.65^(x.66*inv((~x.36*x.67)))>, pkB.38)
+    
+    12. ~x    = ~x.36
+        Y     = x.65^(x.66*inv((~x.36*x.67)))
+        pkB   = pk(skB.40)
+        skB   = skB.40
+        z     = x.65^(x.66*inv(x.67))
+        z.1   = true
+  */
+
+restriction equality:
+  "∀ k1 k2 #i. (Equal( k1, k2 ) @ #i) ⇒ (k1 = k2)"
+  // safety formula
+
+restriction unique:
+  "∀ id1 id2 key #i #j.
+    ((Unique( id1, key ) @ #i) ∧ (Unique( id2, key ) @ #j)) ⇒
+    (id1 = id2)"
+  // safety formula
+
+lemma executability:
+  exists-trace
+  "∃ A B K #i #j.
+    (((Secret( A, K ) @ #i) ∧ (Secret( B, K ) @ #j)) ∧ (¬(A = B))) ∧
+    (¬(∃ B.1 #k. Reveal( B.1 ) @ #k))"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ A B K #i #j.
+  (Secret( A, K ) @ #i) ∧ (Secret( B, K ) @ #j)
+ ∧
+  (¬(A = B)) ∧ (∀ B.1 #k. (Reveal( B.1 ) @ #k) ⇒ ⊥)"
+*/
+simplify
+solve( Secret( A, K ) @ #i )
+  case A_2_receive
+  solve( St_A_2( $A, ~id, $B, skA, pk(skB), ~x ) ▶₀ #i )
+    case A_1_Send
+    solve( Secret( B.1, h(z) ) @ #j )
+      case B_2_Send
+      solve( St_B_2( $B.1, ~id.1, $A.1, skB, pkA, X ) ▶₀ #j )
+        case B_1_receive
+        solve( !KU( sign(<'2', Y>, ~skA.1) ) @ #vk.3 )
+          case B_2_Send
+          solve( splitEqs(1) )
+            case split_case_1
+            solve( !KU( sign(<'1', 'g'^~x>, ~skA.2) ) @ #vk.8 )
+              case A_1_Send
+              solve( !KU( pk(~skA.1) ) @ #vk.5 )
+                case B_2_Send
+                solve( !KU( pk(~skA) ) @ #vk.9 )
+                  case A_1_Send
+                  solve( !KU( 'g'^~y ) @ #vk.8 )
+                    case B_2_Send
+                    solve( !KU( 'g'^~x ) @ #vk.9 )
+                      case A_1_Send
+                      SOLVED // trace found
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+/* All well-formedness checks were successful. */
+
+end

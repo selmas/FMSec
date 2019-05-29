@@ -1,0 +1,124 @@
+theory OTR1
+begin
+
+/*
+	Assignment 2.1: Modeling the original OTR Key Exchange
+
+	1. A -> B: g^x, sign{'1', g^x}(skA), pkA
+	2. B -> A: g^y, sign{'2', g^y}(skB), pkB
+
+*/
+
+builtins: signing, diffie-hellman, hashing
+
+// Public key infrastructure
+rule Register_pk:
+	[ Fr(~skA) ]
+	--[ Register($A) ]->
+	[ !Ltk($A, ~skA), !Pk($A, pk(~skA)), Out(pk(~skA))] 
+
+rule Reveal_ltk:
+	[ !Ltk(A, skA) ] --[ Reveal(A) ]-> [ Out(skA) ]
+
+// Protocol rules
+rule Init_Initiator:
+	[ Fr(~id)
+	, !Ltk($A, skA)
+	, !Pk($B, pkB)
+	]
+	--[ Create_I($A, ~id, 'initiator') 
+	]->
+	[ St_A_1($A, ~id, $B, skA, pkB)
+	]
+
+rule Init_Responder:
+	[ Fr(~id)
+	, !Ltk($B, skB)
+	, !Pk($A, pkA)
+	]
+  --[ Create_R($B, ~id, 'responder')
+	]->
+	[ St_B_1($B, ~id, $A, skB, pkA)
+	]
+
+// A -> B: g^x, sign{'1', g^x}(skA), pkA
+rule A_1_Send:
+	let 
+		gx = 'g'^~x
+		mA1 = <gx, sign{'1', gx}skA, pk(skA)>
+	in
+	[ St_A_1($A, ~id, $B, skA, pkB)
+	, Fr(~x)
+	]
+  --[ Send($A, mA1)
+  	, Unique(~id, skA)
+	]->
+	[ St_A_2($A, ~id, $B, skA, pkB, ~x)
+	, Out(mA1) ]
+
+rule B_1_receive:
+	let 
+		mB1 = <X, sign{'1', X}skA, pkA>
+	in
+	[ St_B_1($B, ~id, $A, skB, pkA)
+	, In(mB1)
+	]
+  --[ Receive($B, mB1)
+  	, Unique(~id,skB)
+  	, Equal(verify(sign{'1', X}skA, <'1', X>, pkA), true)
+	]->
+	[ St_B_2($B, ~id, $A, skB, pkA, X)
+	]
+
+// B -> A: g^y, sign{'2', g^y}(skB), pkB
+rule B_2_Send:
+	let 
+		gy = 'g'^~y
+		mB2 = <gy, sign{'2', gy}skB, pk(skB)>
+		K = h(X^~y)
+	in
+	[ St_B_2($B, ~id, $A, skB, pkA, X)
+	, Fr(~y)
+	]
+	--[ Send($B, mB2)
+	, Secret($B, K)
+	, Unique(~id, skB)
+	, Honest($A)
+	, Honest($B)
+	, Running($B, $A, <'I', 'R', X^~y>)
+	]->
+	[ St_B_3($B, ~id, $A, skB, pkA, K)
+	, Out(mB2)
+	]
+
+rule A_2_receive:
+	let 
+		mA2 = <Y, sign{'2', Y}skB, pkB>
+		K = h(Y^~x)
+	in
+	[ St_A_2($A, ~id, $B, skA, pkB, ~x)
+	, In(mA2)
+	]
+  --[ Receive($A, mA2)
+	, Secret($A, K)
+	, Unique(~id, skA)
+	, Honest($A)
+	, Honest($B)
+	, Equal(verify(sign{'2', Y}skB, <'2', Y>, pkB), true)
+	, Commit($A, $B, <'I', 'R', Y^~x>)	]->
+	[ St_A_3($A, ~id, $B, skA, pkB, K) ]
+
+restriction equality:
+	"All k1 k2 #i. Equal(k1, k2)@i ==> k1 = k2"
+
+restriction unique:
+	"All id1 id2 key #i #j. Unique(id1, key)@i & Unique(id2, key)@j ==> (id1 = id2)"
+
+// This lemma gets verified
+lemma executability:
+	exists-trace
+		"Ex A B K #i #j. 
+			Secret(A, K)@i & Secret(B, K)@j & not (A = B) &
+			not (Ex B #k. Reveal(B)@k)"
+
+end

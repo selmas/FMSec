@@ -73,11 +73,11 @@ rule (modulo E) A_2_Recv:
 rule (modulo E) A_3_Send:
    [ St_A_3( $A, id, $B, sk_AB, x, s, y ) ]
   --[
-  Running( $A, $B, <'R', 'I', y> ),
-  Send_A_3( mac(<$B, y>, kdf(s, x, y)) )
+  Running( $A, $B, <'R', 'I', x, y, kdf(s, x, y)> ),
+  Send_A_3( mac(<'A', 'B', y>, kdf(s, x, y)) )
   ]->
    [
-   Out( mac(<$B, y>, kdf(s, x, y)) ),
+   Out( mac(<'A', 'B', y>, kdf(s, x, y)) ),
    St_A_4( $A, id, $B, sk_AB, x, s, y, kdf(s, x, y) )
    ]
 
@@ -85,89 +85,91 @@ rule (modulo E) A_3_Send:
   rule (modulo AC) A_3_Send:
      [ St_A_3( $A, id, $B, sk_AB, x, s, y ) ]
     --[
-    Running( $A, $B, <'R', 'I', y> ),
-    Send_A_3( <<$B, y>, senc(<$B, y>, kdf(s, x, y))> )
+    Running( $A, $B, <'R', 'I', x, y, kdf(s, x, y)> ),
+    Send_A_3( <<'A', 'B', y>, senc(<'A', 'B', y>, kdf(s, x, y))> )
     ]->
      [
-     Out( <<$B, y>, senc(<$B, y>, kdf(s, x, y))> ),
+     Out( <<'A', 'B', y>, senc(<'A', 'B', y>, kdf(s, x, y))> ),
      St_A_4( $A, id, $B, sk_AB, x, s, y, kdf(s, x, y) )
      ]
   */
 
 rule (modulo E) B_3_Recv:
    [
-   In( mac(<$B, y>, kdf(s, x, y)) ),
+   In( mac(<'A', 'B', y>, kdf(s, x, y)) ),
    St_B_3( $B, id, $A, sk_AB, x, s, y )
    ]
   --[
   Secret( $B, kdf(s, x, y) ), Honest( $A ), Honest( $B ),
-  Commit( $B, $A, <'R', 'I', y> ),
-  Receive_B_3( mac(<$B, y>, kdf(s, x, y)) ), Finish( $B )
+  Commit( $B, $A, <'R', 'I', x, y, kdf(s, x, y)> ),
+  Receive_B_3( mac(<'A', 'B', y>, kdf(s, x, y)) ), Finish( $B )
   ]->
    [ St_B_4( $B, id, $A, sk_AB, x, s, y, kdf(s, x, y) ) ]
 
   /*
   rule (modulo AC) B_3_Recv:
      [
-     In( <<$B, y>, senc(<$B, y>, kdf(s, x, y))> ),
+     In( <<'A', 'B', y>, senc(<'A', 'B', y>, kdf(s, x, y))> ),
      St_B_3( $B, id, $A, sk_AB, x, s, y )
      ]
     --[
     Secret( $B, kdf(s, x, y) ), Honest( $A ), Honest( $B ),
-    Commit( $B, $A, <'R', 'I', y> ),
-    Receive_B_3( <<$B, y>, senc(<$B, y>, kdf(s, x, y))> ), Finish( $B )
+    Commit( $B, $A, <'R', 'I', x, y, kdf(s, x, y)> ),
+    Receive_B_3( <<'A', 'B', y>, senc(<'A', 'B', y>, kdf(s, x, y))> ),
+    Finish( $B )
     ]->
      [ St_B_4( $B, id, $A, sk_AB, x, s, y, kdf(s, x, y) ) ]
   */
 
 rule (modulo E) B_4_Send:
-   [ St_B_4( $B, id, $A, sk_AB, x, s, y, kdf(s, x, y) ) ]
+   [ St_B_4( $B, id, $A, sk_AB, x, s, y, Kab ) ]
   --[
-  Running( $B, $A, <'I', 'R', x> ),
-  Send_B_4( mac(<$A, x>, kdf(s, x, y)) )
+  Running( $B, $A, <'I', 'R', x, y, Kab> ),
+  Send_B_4( mac(<'B', 'A', x>, Kab) )
   ]->
    [
-   Out( mac(<$A, x>, kdf(s, x, y)) ),
-   St_B_5( $B, id, $A, sk_AB, x, s, y, kdf(s, x, y) )
+   Out( mac(<'B', 'A', x>, Kab) ),
+   St_B_5( $B, id, $A, sk_AB, x, s, y, Kab )
    ]
 
   /*
   rule (modulo AC) B_4_Send:
-     [ St_B_4( $B, id, $A, sk_AB, x, s, y, kdf(s, x, y) ) ]
+     [ St_B_4( $B, id, $A, sk_AB, x, s, y, Kab ) ]
     --[
-    Running( $B, $A, <'I', 'R', x> ),
-    Send_B_4( <<$A, x>, senc(<$A, x>, kdf(s, x, y))> )
+    Running( $B, $A, <'I', 'R', x, y, Kab> ),
+    Send_B_4( <<'B', 'A', x>, senc(<'B', 'A', x>, Kab)> )
     ]->
      [
-     Out( <<$A, x>, senc(<$A, x>, kdf(s, x, y))> ),
-     St_B_5( $B, id, $A, sk_AB, x, s, y, kdf(s, x, y) )
+     Out( <<'B', 'A', x>, senc(<'B', 'A', x>, Kab)> ),
+     St_B_5( $B, id, $A, sk_AB, x, s, y, Kab )
      ]
   */
 
 rule (modulo E) A_4_Recv:
    [
-   In( mac(<$A, x>, kdf(s, x, y)) ),
-   St_A_4( $A, id, $B, sk_AB, x, s, y, kdf(s, x, y) )
+   In( mac(<'B', 'A', x>, Kab) ),
+   St_A_4( $A, id, $B, sk_AB, x, s, y, Kab )
    ]
   --[
-  Secret( $A, kdf(s, x, y) ), Honest( $A ), Honest( $B ),
-  Commit( $A, $B, <'I', 'R', x> ),
-  Receive_A_4( mac(<$A, x>, kdf(s, x, y)) ), Finish( $A )
+  Secret( $A, Kab ), Honest( $A ), Honest( $B ),
+  Commit( $A, $B, <'I', 'R', x, y, Kab> ),
+  Receive_A_4( mac(<'B', 'A', x>, Kab) ), Finish( $A )
   ]->
-   [ St_A_5( $A, id, $B, sk_AB, x, y, kdf(s, x, y) ) ]
+   [ St_A_5( $A, id, $B, sk_AB, x, y, Kab ) ]
 
   /*
   rule (modulo AC) A_4_Recv:
      [
-     In( <<$A, x>, senc(<$A, x>, kdf(s, x, y))> ),
-     St_A_4( $A, id, $B, sk_AB, x, s, y, kdf(s, x, y) )
+     In( <<'B', 'A', x>, senc(<'B', 'A', x>, Kab)> ),
+     St_A_4( $A, id, $B, sk_AB, x, s, y, Kab )
      ]
     --[
-    Secret( $A, kdf(s, x, y) ), Honest( $A ), Honest( $B ),
-    Commit( $A, $B, <'I', 'R', x> ),
-    Receive_A_4( <<$A, x>, senc(<$A, x>, kdf(s, x, y))> ), Finish( $A )
+    Secret( $A, Kab ), Honest( $A ), Honest( $B ),
+    Commit( $A, $B, <'I', 'R', x, y, Kab> ),
+    Receive_A_4( <<'B', 'A', x>, senc(<'B', 'A', x>, Kab)> ),
+    Finish( $A )
     ]->
-     [ St_A_5( $A, id, $B, sk_AB, x, y, kdf(s, x, y) ) ]
+     [ St_A_5( $A, id, $B, sk_AB, x, y, Kab ) ]
   */
 
 restriction onekeyperpair:
@@ -175,55 +177,55 @@ restriction onekeyperpair:
     ((Register( A, B ) @ #i) ∧ (Register( A, B ) @ #j)) ⇒ (#i = #j)"
   // safety formula
 
-restriction nokeywithyourself:
-  "∀ A B #i. (Register( A, B ) @ #i) ⇒ (¬(A = B))"
-  // safety formula
-
 lemma executable:
   exists-trace
   "∃ A B #i #j.
-    ((Finish( A ) @ #i) ∧ (Finish( B ) @ #j)) ∧ (¬(A = B))"
+    (((((Finish( A ) @ #i) ∧ (Finish( B ) @ #j)) ∧ (¬(A = B))) ∧
+      (¬(∃ X #r. Reveal( X ) @ #r))) ∧
+     (∀ A.1 B.1 id1 id2 #i.1 #j.1.
+       ((Create( A.1, id1, 'A' ) @ #i.1) ∧
+        (Create( B.1, id2, 'A' ) @ #j.1)) ⇒
+       ((A.1 = B.1) ∧ (id1 = id2)))) ∧
+    (∀ A.1 B.1 id1 id2 #i.1 #j.1.
+      ((Create( A.1, id1, 'B' ) @ #i.1) ∧
+       (Create( B.1, id2, 'B' ) @ #j.1)) ⇒
+      ((A.1 = B.1) ∧ (id1 = id2)))"
 /*
 guarded formula characterizing all satisfying traces:
-"∃ A B #i #j. (Finish( A ) @ #i) ∧ (Finish( B ) @ #j) ∧ ¬(A = B)"
+"∃ A B #i #j.
+  (Finish( A ) @ #i) ∧ (Finish( B ) @ #j)
+ ∧
+  (¬(A = B)) ∧
+  (∀ X #r. (Reveal( X ) @ #r) ⇒ ⊥) ∧
+  (∀ A.1 B.1 id1 id2 #i.1 #j.1.
+    (Create( A.1, id1, 'A' ) @ #i.1) ∧ (Create( B.1, id2, 'A' ) @ #j.1)
+   ⇒
+    (A.1 = B.1) ∧ (id1 = id2)) ∧
+  (∀ A.1 B.1 id1 id2 #i.1 #j.1.
+    (Create( A.1, id1, 'B' ) @ #i.1) ∧ (Create( B.1, id2, 'B' ) @ #j.1)
+   ⇒
+    (A.1 = B.1) ∧ (id1 = id2))"
 */
 simplify
 solve( Finish( A ) @ #i )
   case A_4_Recv
-  solve( St_A_4( $A, id, $B, sk_AB, x, s, y, kdf(s, x, y) ) ▶₁ #i )
+  solve( St_A_4( $A, id, $B, sk_AB, x, s, y, Kab ) ▶₁ #i )
     case A_3_Send
     solve( Finish( B.1 ) @ #j )
-      case A_4_Recv
-      solve( St_A_4( $A.1, id.1, $B.1, sk_AB, x.1, s.1, y.1,
-                     kdf(s.1, x.1, y.1)
-             ) ▶₁ #j )
-        case A_3_Send
-        solve( !KU( senc(<$A, ~x>, kdf(~s, ~x, y)) ) @ #vk.4 )
+      case B_3_Recv
+      solve( St_B_3( $B.1, id.1, $A.1, sk_AB, x.1, s.1, y.1 ) ▶₁ #j )
+        case B_2_Send
+        solve( !KU( senc(<'B', 'A', ~x>, kdf(~s, ~x, y)) ) @ #vk.9 )
           case B_4_Send
-          solve( !KU( senc(<$A.1, ~x.1>, kdf(~s.1, ~x.1, y.1)) ) @ #vk.12 )
-            case B_4_Send
-            solve( !KU( senc(<$B.2, ~y>, kdf(~s, ~x, ~y)) ) @ #vk.18 )
-              case A_3_Send
-              solve( !KU( senc(<$B.2, ~y.1>, kdf(~s.1, ~x.1, ~y.1)) ) @ #vk.22 )
-                case A_3_Send
-                solve( !KU( ~x ) @ #vk.9 )
-                  case A_1_Send
-                  solve( !KU( ~x.1 ) @ #vk.16 )
-                    case A_1_Send
-                    solve( !KU( ~y ) @ #vk.13 )
-                      case B_2_Send
-                      solve( !KU( ~y.1 ) @ #vk.18 )
-                        case B_2_Send
-                        solve( !KU( senc(~s, h(~sk)) ) @ #vk.21 )
-                          case A_1_Send
-                          solve( !KU( senc(~s.1, h(~sk.1)) ) @ #vk.23 )
-                            case A_1_Send
-                            SOLVED // trace found
-                          qed
-                        qed
-                      qed
-                    qed
-                  qed
+          solve( !KU( senc(~s, h(~sk.1)) ) @ #vk.13 )
+            case A_1_Send
+            solve( !KU( ~x ) @ #vk.10 )
+              case A_1_Send
+              solve( !KU( ~y ) @ #vk.12 )
+                case B_2_Send
+                solve( !KU( senc(<'A', 'B', ~y>, kdf(~s, ~x, ~y)) ) @ #vk.13 )
+                  case A_3_Send
+                  SOLVED // trace found
                 qed
               qed
             qed
@@ -251,13 +253,13 @@ guarded formula characterizing all counter-examples:
 simplify
 solve( Secret( A, x ) @ #i )
   case A_4_Recv
-  solve( St_A_4( $A, id, $B, sk_AB, x, s, y, kdf(s, x, y) ) ▶₁ #i )
+  solve( St_A_4( $A, id, $B, sk_AB, x, s, y, x.1 ) ▶₁ #i )
     case A_3_Send
     solve( !KU( kdf(~s, ~x, y) ) @ #vk )
       case c_kdf
-      solve( !KU( ~s ) @ #vk.7 )
+      solve( !KU( ~s ) @ #vk.9 )
         case A_1_Send
-        solve( !KU( ~sk ) @ #vk.9 )
+        solve( !KU( ~sk ) @ #vk.11 )
           case Reveal_A
           by contradiction /* from formulas */
         next
@@ -273,20 +275,20 @@ next
     case B_2_Send
     solve( !KU( kdf(s, x, ~y) ) @ #vk )
       case c_kdf
-      solve( !KU( senc(<$B, ~y>, kdf(s, x, ~y)) ) @ #vk.5 )
+      solve( !KU( senc(<'A', 'B', ~y>, kdf(s, x, ~y)) ) @ #vk.7 )
         case A_3_Send
-        solve( !KU( ~s ) @ #vk.9 )
+        solve( !KU( ~s ) @ #vk.11 )
           case A_1_Send
-          solve( !KU( ~sk.1 ) @ #vk.11 )
+          solve( !KU( ~sk.1 ) @ #vk.13 )
             case Reveal_A
-            solve( !KU( senc(~s, h(~sk)) ) @ #vk.11 )
+            solve( !KU( senc(~s, h(~sk)) ) @ #vk.13 )
               case A_1_Send
               by contradiction /* from formulas */
             next
               case c_senc
-              solve( !KU( h(~sk) ) @ #vk.12 )
+              solve( !KU( h(~sk) ) @ #vk.14 )
                 case c_h
-                solve( !KU( ~sk ) @ #vk.13 )
+                solve( !KU( ~sk ) @ #vk.15 )
                   case Reveal_A
                   by contradiction /* from formulas */
                 next
@@ -297,19 +299,31 @@ next
             qed
           next
             case Reveal_B
-            by contradiction /* from formulas */
+            solve( !KU( senc(~s, h(~sk)) ) @ #vk.13 )
+              case A_1_Send
+              by contradiction /* from formulas */
+            next
+              case c_senc
+              solve( !KU( h(~sk) ) @ #vk.14 )
+                case c_h
+                solve( !KU( ~sk ) @ #vk.15 )
+                  case Reveal_A
+                  by contradiction /* from formulas */
+                next
+                  case Reveal_B
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
           qed
         qed
       next
-        case B_4_Send
-        by contradiction /* cyclic */
-      next
         case c_senc
-        solve( !KU( senc(s, h(~sk)) ) @ #vk.8 )
+        solve( !KU( senc(s, h(~sk)) ) @ #vk.10 )
           case A_1_Send
-          solve( !KU( ~s ) @ #vk.9 )
+          solve( !KU( ~s ) @ #vk.11 )
             case A_1_Send
-            solve( !KU( ~sk ) @ #vk.11 )
+            solve( !KU( ~sk ) @ #vk.13 )
               case Reveal_A
               by contradiction /* from formulas */
             next
@@ -319,9 +333,9 @@ next
           qed
         next
           case c_senc
-          solve( !KU( h(~sk) ) @ #vk.10 )
+          solve( !KU( h(~sk) ) @ #vk.12 )
             case c_h
-            solve( !KU( ~sk ) @ #vk.11 )
+            solve( !KU( ~sk ) @ #vk.13 )
               case Reveal_A
               by contradiction /* from formulas */
             next
@@ -352,39 +366,33 @@ guarded formula characterizing all counter-examples:
 simplify
 solve( Commit( a, b, <'I', 'R', t> ) @ #i )
   case A_4_Recv
-  solve( St_A_4( $A, id, $B, sk_AB, t, s, y, kdf(s, t, y) ) ▶₁ #i )
+  solve( St_A_4( $A, id, $B, sk_AB, x, s, y, Kab ) ▶₁ #i )
     case A_3_Send
-    solve( !KU( senc(<$A, ~x>, kdf(~s, ~x, y)) ) @ #vk.4 )
-      case A_3_Send
-      by contradiction /* from formulas */
-    next
+    solve( !KU( senc(<'B', 'A', ~x>, kdf(~s, ~x, y)) ) @ #vk.6 )
       case B_4_Send
-      solve( !KU( senc(<$B.1, ~y>, kdf(~s, ~x, ~y)) ) @ #vk.10 )
-        case A_3_Send
+      solve( !KU( senc(~s, h(~sk.1)) ) @ #vk.13 )
+        case A_1_Send
         by contradiction /* from formulas */
       next
         case c_senc
-        solve( !KU( kdf(~s, ~x, ~y) ) @ #vk.12 )
-          case c_kdf
-          solve( !KU( ~s ) @ #vk.13 )
-            case A_1_Send
-            solve( !KU( ~sk ) @ #vk.15 )
-              case Reveal_A
-              by contradiction /* from formulas */
-            next
-              case Reveal_B
-              by contradiction /* from formulas */
-            qed
+        solve( !KU( ~s ) @ #vk.14 )
+          case A_1_Send
+          solve( !KU( ~sk ) @ #vk.17 )
+            case Reveal_A
+            by contradiction /* from formulas */
+          next
+            case Reveal_B
+            by contradiction /* from formulas */
           qed
         qed
       qed
     next
       case c_senc
-      solve( !KU( kdf(~s, ~x, y) ) @ #vk.6 )
+      solve( !KU( kdf(~s, ~x, y) ) @ #vk.8 )
         case c_kdf
-        solve( !KU( ~s ) @ #vk.7 )
+        solve( !KU( ~s ) @ #vk.9 )
           case A_1_Send
-          solve( !KU( ~sk ) @ #vk.9 )
+          solve( !KU( ~sk ) @ #vk.11 )
             case Reveal_A
             by contradiction /* from formulas */
           next
@@ -421,21 +429,19 @@ guarded formula characterizing all counter-examples:
 simplify
 solve( Commit( a, b, <'I', 'R', t> ) @ #i )
   case A_4_Recv
-  solve( St_A_4( $A, id, $B, sk_AB, t, s, y, kdf(s, t, y) ) ▶₁ #i )
+  solve( St_A_4( $A, id, $B, sk_AB, x, s, y, Kab ) ▶₁ #i )
     case A_3_Send
-    solve( !KU( senc(<$A, ~x>, kdf(~s, ~x, y)) ) @ #vk.4 )
-      case A_3_Send
-      by contradiction /* from formulas */
-    next
+    solve( !KU( senc(<'B', 'A', ~x>, kdf(~s, ~x, y)) ) @ #vk.6 )
       case B_4_Send
-      solve( !KU( senc(<$B.1, ~y>, kdf(~s, ~x, ~y)) ) @ #vk.10 )
-        case A_3_Send
+      solve( !KU( senc(~s, h(~sk.1)) ) @ #vk.13 )
+        case A_1_Send
         solve( (#i2 < #i)  ∥ (#i < #i2) )
           case case_1
-          solve( Commit( a2, b2, <'I', 'R', ~x> ) @ #i2 )
+          solve( Commit( a2, b2, <'I', 'R', ~x, ~y, kdf(~s, ~x, ~y)>
+                 ) @ #i2 )
             case A_4_Recv
-            solve( St_A_4( $A.1, id.1, $B.1, sk_AB, ~x, s.1, y.1,
-                           kdf(s.1, ~x, y.1)
+            solve( St_A_4( $A.1, id.1, $B.1, sk_AB, ~x, s.1, ~y,
+                           kdf(~s, ~x, ~y)
                    ) ▶₁ #i2 )
               case A_3_Send
               by contradiction /* cyclic */
@@ -443,10 +449,11 @@ solve( Commit( a, b, <'I', 'R', t> ) @ #i )
           qed
         next
           case case_2
-          solve( Commit( a2, b2, <'I', 'R', ~x> ) @ #i2 )
+          solve( Commit( a2, b2, <'I', 'R', ~x, ~y, kdf(~s, ~x, ~y)>
+                 ) @ #i2 )
             case A_4_Recv
-            solve( St_A_4( $A.1, id.1, $B.1, sk_AB, ~x, s.1, y.1,
-                           kdf(s.1, ~x, y.1)
+            solve( St_A_4( $A.1, id.1, $B.1, sk_AB, ~x, s.1, ~y,
+                           kdf(~s, ~x, ~y)
                    ) ▶₁ #i2 )
               case A_3_Send
               by contradiction /* cyclic */
@@ -455,27 +462,24 @@ solve( Commit( a, b, <'I', 'R', t> ) @ #i )
         qed
       next
         case c_senc
-        solve( !KU( kdf(~s, ~x, ~y) ) @ #vk.12 )
-          case c_kdf
-          solve( !KU( ~s ) @ #vk.13 )
-            case A_1_Send
-            solve( !KU( ~sk ) @ #vk.15 )
-              case Reveal_A
-              by contradiction /* from formulas */
-            next
-              case Reveal_B
-              by contradiction /* from formulas */
-            qed
+        solve( !KU( ~s ) @ #vk.14 )
+          case A_1_Send
+          solve( !KU( ~sk ) @ #vk.17 )
+            case Reveal_A
+            by contradiction /* from formulas */
+          next
+            case Reveal_B
+            by contradiction /* from formulas */
           qed
         qed
       qed
     next
       case c_senc
-      solve( !KU( kdf(~s, ~x, y) ) @ #vk.6 )
+      solve( !KU( kdf(~s, ~x, y) ) @ #vk.8 )
         case c_kdf
-        solve( !KU( ~s ) @ #vk.7 )
+        solve( !KU( ~s ) @ #vk.9 )
           case A_1_Send
-          solve( !KU( ~sk ) @ #vk.9 )
+          solve( !KU( ~sk ) @ #vk.11 )
             case Reveal_A
             by contradiction /* from formulas */
           next
@@ -505,22 +509,22 @@ guarded formula characterizing all counter-examples:
 simplify
 solve( Commit( a, b, <'R', 'I', t> ) @ #i )
   case B_3_Recv
-  solve( St_B_3( $B, id, $A, sk_AB, x, s, t ) ▶₁ #i )
+  solve( St_B_3( $B, id, $A, sk_AB, x, s, y ) ▶₁ #i )
     case B_2_Send
-    solve( !KU( senc(<$B, ~y>, kdf(s, x, ~y)) ) @ #vk.4 )
+    solve( !KU( senc(<'A', 'B', ~y>, kdf(s, x, ~y)) ) @ #vk.6 )
       case A_3_Send
-      solve( !KU( senc(~s, h(~sk)) ) @ #vk.7 )
+      solve( !KU( senc(~s, h(~sk)) ) @ #vk.9 )
         case A_1_Send
         by contradiction /* from formulas */
       next
         case c_senc
-        solve( !KU( ~s ) @ #vk.8 )
+        solve( !KU( ~s ) @ #vk.10 )
           case A_1_Send
-          solve( !KU( ~sk.1 ) @ #vk.11 )
+          solve( !KU( ~sk.1 ) @ #vk.13 )
             case Reveal_A
-            solve( !KU( h(~sk) ) @ #vk.11 )
+            solve( !KU( h(~sk) ) @ #vk.13 )
               case c_h
-              solve( !KU( ~sk ) @ #vk.12 )
+              solve( !KU( ~sk ) @ #vk.14 )
                 case Reveal_A
                 by contradiction /* from formulas */
               next
@@ -530,22 +534,28 @@ solve( Commit( a, b, <'R', 'I', t> ) @ #i )
             qed
           next
             case Reveal_B
-            by contradiction /* from formulas */
+            solve( !KU( h(~sk) ) @ #vk.13 )
+              case c_h
+              solve( !KU( ~sk ) @ #vk.14 )
+                case Reveal_A
+                by contradiction /* from formulas */
+              next
+                case Reveal_B
+                by contradiction /* from formulas */
+              qed
+            qed
           qed
         qed
       qed
     next
-      case B_4_Send
-      by contradiction /* cyclic */
-    next
       case c_senc
-      solve( !KU( kdf(s, x, ~y) ) @ #vk.8 )
+      solve( !KU( kdf(s, x, ~y) ) @ #vk.10 )
         case c_kdf
-        solve( !KU( senc(s, h(~sk)) ) @ #vk.8 )
+        solve( !KU( senc(s, h(~sk)) ) @ #vk.10 )
           case A_1_Send
-          solve( !KU( ~s ) @ #vk.9 )
+          solve( !KU( ~s ) @ #vk.11 )
             case A_1_Send
-            solve( !KU( ~sk ) @ #vk.11 )
+            solve( !KU( ~sk ) @ #vk.13 )
               case Reveal_A
               by contradiction /* from formulas */
             next
@@ -555,9 +565,9 @@ solve( Commit( a, b, <'R', 'I', t> ) @ #i )
           qed
         next
           case c_senc
-          solve( !KU( h(~sk) ) @ #vk.10 )
+          solve( !KU( h(~sk) ) @ #vk.12 )
             case c_h
-            solve( !KU( ~sk ) @ #vk.11 )
+            solve( !KU( ~sk ) @ #vk.13 )
               case Reveal_A
               by contradiction /* from formulas */
             next
@@ -595,26 +605,28 @@ guarded formula characterizing all counter-examples:
 simplify
 solve( Commit( a, b, <'R', 'I', t> ) @ #i )
   case B_3_Recv
-  solve( St_B_3( $B, id, $A, sk_AB, x, s, t ) ▶₁ #i )
+  solve( St_B_3( $B, id, $A, sk_AB, x, s, y ) ▶₁ #i )
     case B_2_Send
-    solve( !KU( senc(<$B, ~y>, kdf(s, x, ~y)) ) @ #vk.4 )
+    solve( !KU( senc(<'A', 'B', ~y>, kdf(s, x, ~y)) ) @ #vk.6 )
       case A_3_Send
-      solve( !KU( senc(~s, h(~sk)) ) @ #vk.7 )
+      solve( !KU( senc(~s, h(~sk)) ) @ #vk.9 )
         case A_1_Send
         solve( (#i2 < #i)  ∥ (#i < #i2) )
           case case_1
-          solve( Commit( a2, b2, <'R', 'I', ~y> ) @ #i2 )
+          solve( Commit( a2, b2, <'R', 'I', ~x, ~y, kdf(~s, ~x, ~y)>
+                 ) @ #i2 )
             case B_3_Recv
-            solve( St_B_3( $B.1, id.1, $A.1, sk_AB, x.1, s.1, ~y ) ▶₁ #i2 )
+            solve( St_B_3( $B.1, id.1, $A.1, sk_AB, ~x, ~s, ~y ) ▶₁ #i2 )
               case B_2_Send
               by contradiction /* cyclic */
             qed
           qed
         next
           case case_2
-          solve( Commit( a2, b2, <'R', 'I', ~y> ) @ #i2 )
+          solve( Commit( a2, b2, <'R', 'I', ~x, ~y, kdf(~s, ~x, ~y)>
+                 ) @ #i2 )
             case B_3_Recv
-            solve( St_B_3( $B.1, id.1, $A.1, sk_AB, x.1, s.1, ~y ) ▶₁ #i2 )
+            solve( St_B_3( $B.1, id.1, $A.1, sk_AB, ~x, ~s, ~y ) ▶₁ #i2 )
               case B_2_Send
               by contradiction /* cyclic */
             qed
@@ -622,13 +634,13 @@ solve( Commit( a, b, <'R', 'I', t> ) @ #i )
         qed
       next
         case c_senc
-        solve( !KU( ~s ) @ #vk.8 )
+        solve( !KU( ~s ) @ #vk.10 )
           case A_1_Send
-          solve( !KU( ~sk.1 ) @ #vk.11 )
+          solve( !KU( ~sk.1 ) @ #vk.13 )
             case Reveal_A
-            solve( !KU( h(~sk) ) @ #vk.11 )
+            solve( !KU( h(~sk) ) @ #vk.13 )
               case c_h
-              solve( !KU( ~sk ) @ #vk.12 )
+              solve( !KU( ~sk ) @ #vk.14 )
                 case Reveal_A
                 by contradiction /* from formulas */
               next
@@ -638,22 +650,28 @@ solve( Commit( a, b, <'R', 'I', t> ) @ #i )
             qed
           next
             case Reveal_B
-            by contradiction /* from formulas */
+            solve( !KU( h(~sk) ) @ #vk.13 )
+              case c_h
+              solve( !KU( ~sk ) @ #vk.14 )
+                case Reveal_A
+                by contradiction /* from formulas */
+              next
+                case Reveal_B
+                by contradiction /* from formulas */
+              qed
+            qed
           qed
         qed
       qed
     next
-      case B_4_Send
-      by contradiction /* cyclic */
-    next
       case c_senc
-      solve( !KU( kdf(s, x, ~y) ) @ #vk.8 )
+      solve( !KU( kdf(s, x, ~y) ) @ #vk.10 )
         case c_kdf
-        solve( !KU( senc(s, h(~sk)) ) @ #vk.8 )
+        solve( !KU( senc(s, h(~sk)) ) @ #vk.10 )
           case A_1_Send
-          solve( !KU( ~s ) @ #vk.9 )
+          solve( !KU( ~s ) @ #vk.11 )
             case A_1_Send
-            solve( !KU( ~sk ) @ #vk.11 )
+            solve( !KU( ~sk ) @ #vk.13 )
               case Reveal_A
               by contradiction /* from formulas */
             next
@@ -663,9 +681,9 @@ solve( Commit( a, b, <'R', 'I', t> ) @ #i )
           qed
         next
           case c_senc
-          solve( !KU( h(~sk) ) @ #vk.10 )
+          solve( !KU( h(~sk) ) @ #vk.12 )
             case c_h
-            solve( !KU( ~sk ) @ #vk.11 )
+            solve( !KU( ~sk ) @ #vk.13 )
               case Reveal_A
               by contradiction /* from formulas */
             next

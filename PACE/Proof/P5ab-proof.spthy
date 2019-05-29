@@ -1,0 +1,3304 @@
+theory P5ab begin
+
+// Function signature and definition of the equational theory E
+
+builtins: diffie-hellman
+functions: fst/1, h/1, mac/2, map/1, pair/2, sdec/2, senc/2, snd/1
+equations:
+    fst(<x.1, x.2>) = x.1,
+    mac(m, k) = <m, senc(m, k)>,
+    sdec(senc(x.1, x.2), x.2) = x.1,
+    snd(<x.1, x.2>) = x.2
+
+
+
+rule (modulo E) Register:
+   [ Fr( ~sk ) ] --[ Register( $I, $R ) ]-> [ !Lkt( $I, $R, ~sk ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Reveal_A:
+   [ !Lkt( $I, $R, ltk ) ] --[ Reveal( $I ) ]-> [ Out( ltk ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Reveal_B:
+   [ !Lkt( $I, $R, ltk ) ] --[ Reveal( $R ) ]-> [ Out( ltk ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Init_A:
+   [ Fr( ~id ), Fr( ~s ), !Lkt( $A, $B, sk_AB ) ]
+  --[ Create( $A, ~id, 'A' ) ]->
+   [ St_A_1( $A, ~id, $B, sk_AB, ~s ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Init_B:
+   [ Fr( ~id ), !Lkt( $A, $B, sk_AB ) ]
+  --[ Create( $B, ~id, 'B' ) ]->
+   [ St_B_1( $B, ~id, $A, sk_AB ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A_1_Send:
+   [ Fr( ~x ), St_A_1( $A, id, $B, sk_AB, s ) ]
+  --[ Send_A_1( <map(<s, 'p'>)^~x, senc(s, h(sk_AB)), 'p'> ) ]->
+   [
+   Out( <map(<s, 'p'>)^~x, senc(s, h(sk_AB)), 'p'> ),
+   St_A_2( $A, id, $B, sk_AB, ~x, s, 'p' )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) B_1_Recv:
+   [ In( <gx, senc(s, h(sk_AB)), 'p'> ), St_B_1( $B, id, $A, sk_AB ) ]
+  --[ Receive_B_1( <gx, senc(s, h(sk_AB)), 'p'> ) ]->
+   [ St_B_2( $B, id, $A, sk_AB, gx, s, 'p' ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) B_2_Send:
+   [ Fr( ~y ), St_B_2( $B, id, $A, sk_AB, gx, s, 'p' ) ]
+  --[ Send_B_2( map(<s, 'p'>)^~y ) ]->
+   [
+   Out( map(<s, 'p'>)^~y ),
+   St_B_3( $B, id, $A, sk_AB, gx, s, 'p', ~y )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A_2_Recv:
+   [ In( gy ), St_A_2( $A, id, $B, sk_AB, x, s, 'p' ) ]
+  --[ Receive_A_2( gy ) ]->
+   [ St_A_3( $A, id, $B, sk_AB, x, s, 'p', gy ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A_3_Send:
+   [ St_A_3( $A, id, $B, sk_AB, x, s, 'p', gy ) ]
+  --[
+  Running( $A, $B, <'R', 'I', map(<s, 'p'>)^x, gy, h(gy^x)> ),
+  Send_A_3( mac(<'A', 'B', gy>, h(gy^x)) )
+  ]->
+   [
+   Out( mac(<'A', 'B', gy>, h(gy^x)) ),
+   St_A_4( $A, id, $B, sk_AB, x, s, 'p', gy, h(gy^x) )
+   ]
+
+  /*
+  rule (modulo AC) A_3_Send:
+     [ St_A_3( $A, id, $B, sk_AB, x, s, 'p', gy ) ]
+    --[
+    Running( $A, $B, <'R', 'I', z.1, gy, h(z)> ),
+    Send_A_3( <<'A', 'B', gy>, senc(<'A', 'B', gy>, h(z))> )
+    ]->
+     [
+     Out( <<'A', 'B', gy>, senc(<'A', 'B', gy>, h(z))> ),
+     St_A_4( $A, id, $B, sk_AB, x, s, 'p', gy, h(z) )
+     ]
+    variants (modulo AC)
+     1. gy    = gy.30
+        s     = s.32
+        x     = one
+        z     = gy.30
+        z.1   = map(<s.32, 'p'>)
+    
+     2. gy    = gy.32
+        s     = s.34
+        x     = x.36
+        z     = gy.32^x.36
+        z.1   = map(<s.34, 'p'>)^x.36
+    
+     3. gy    = z.38^inv(x.35)
+        s     = s.33
+        x     = x.35
+        z     = z.38
+        z.1   = map(<s.33, 'p'>)^x.35
+    
+     4. gy    = z.305^x.594
+        s     = s.300
+        x     = inv(x.594)
+        z     = z.305
+        z.1   = map(<s.300, 'p'>)^inv(x.594)
+    
+     5. gy    = z.306^(x.595*inv(x.596))
+        s     = s.301
+        x     = (x.596*inv(x.595))
+        z     = z.306
+        z.1   = map(<s.301, 'p'>)^(x.596*inv(x.595))
+    
+     6. gy    = x.593^x.594
+        s     = s.300
+        x     = x.302
+        z     = x.593^(x.302*x.594)
+        z.1   = map(<s.300, 'p'>)^x.302
+    
+     7. gy    = x.593^(x.594*inv(x.302))
+        s     = s.300
+        x     = x.302
+        z     = x.593^x.594
+        z.1   = map(<s.300, 'p'>)^x.302
+    
+     8. gy    = x.594^inv((x.303*x.596))
+        s     = s.301
+        x     = x.303
+        z     = x.594^inv(x.596)
+        z.1   = map(<s.301, 'p'>)^x.303
+    
+     9. gy    = x.594^(x.595*x.596)
+        s     = s.301
+        x     = inv(x.595)
+        z     = x.594^x.596
+        z.1   = map(<s.301, 'p'>)^inv(x.595)
+    
+    10. gy    = x.595^(x.596*x.597*inv(x.598))
+        s     = s.302
+        x     = (x.598*inv(x.596))
+        z     = x.595^x.597
+        z.1   = map(<s.302, 'p'>)^(x.598*inv(x.596))
+    
+    11. gy    = x.595^(x.596*inv((x.304*x.598)))
+        s     = s.302
+        x     = x.304
+        z     = x.595^(x.596*inv(x.598))
+        z.1   = map(<s.302, 'p'>)^x.304
+    
+    12. gy    = x.595^(x.596*inv((x.597*x.598)))
+        s     = s.302
+        x     = (x.597*inv(x.596))
+        z     = x.595^inv(x.598)
+        z.1   = map(<s.302, 'p'>)^(x.597*inv(x.596))
+    
+    13. gy    = x.596^(x.597*x.598*inv((x.599*x.600)))
+        s     = s.303
+        x     = (x.599*inv(x.597))
+        z     = x.596^(x.598*inv(x.600))
+        z.1   = map(<s.303, 'p'>)^(x.599*inv(x.597))
+    
+    14. gy    = x.597^x.598
+        s     = s.304
+        x     = inv((x.598*x.602))
+        z     = x.597^inv(x.602)
+        z.1   = map(<s.304, 'p'>)^inv((x.598*x.602))
+    
+    15. gy    = x.597^x.598
+        s     = s.304
+        x     = (x.602*inv(x.598))
+        z     = x.597^x.602
+        z.1   = map(<s.304, 'p'>)^(x.602*inv(x.598))
+    
+    16. gy    = x.597^inv(x.598)
+        s     = s.304
+        x     = inv(x.602)
+        z     = x.597^inv((x.598*x.602))
+        z.1   = map(<s.304, 'p'>)^inv(x.602)
+    
+    17. gy    = x.597^inv(x.598)
+        s     = s.304
+        x     = (x.598*x.602)
+        z     = x.597^x.602
+        z.1   = map(<s.304, 'p'>)^(x.598*x.602)
+    
+    18. gy    = x.598^x.599
+        s     = s.305
+        x     = (x.603*inv((x.599*x.604)))
+        z     = x.598^(x.603*inv(x.604))
+        z.1   = map(<s.305, 'p'>)^(x.603*inv((x.599*x.604)))
+    
+    19. gy    = x.598^inv(x.599)
+        s     = s.305
+        x     = (x.603*inv(x.604))
+        z     = x.598^(x.603*inv((x.599*x.604)))
+        z.1   = map(<s.305, 'p'>)^(x.603*inv(x.604))
+    
+    20. gy    = x.598^inv((x.599*x.600))
+        s     = s.305
+        x     = (x.599*x.604)
+        z     = x.598^(x.604*inv(x.600))
+        z.1   = map(<s.305, 'p'>)^(x.599*x.604)
+    
+    21. gy    = x.598^inv((x.599*x.600))
+        s     = s.305
+        x     = (x.599*inv(x.604))
+        z     = x.598^inv((x.600*x.604))
+        z.1   = map(<s.305, 'p'>)^(x.599*inv(x.604))
+    
+    22. gy    = x.598^(x.599*x.600)
+        s     = s.305
+        x     = inv((x.599*x.604))
+        z     = x.598^(x.600*inv(x.604))
+        z.1   = map(<s.305, 'p'>)^inv((x.599*x.604))
+    
+    23. gy    = x.598^(x.599*x.600)
+        s     = s.305
+        x     = (x.604*inv(x.599))
+        z     = x.598^(x.600*x.604)
+        z.1   = map(<s.305, 'p'>)^(x.604*inv(x.599))
+    
+    24. gy    = x.598^(x.599*inv(x.600))
+        s     = s.305
+        x     = inv(x.604)
+        z     = x.598^(x.599*inv((x.600*x.604)))
+        z.1   = map(<s.305, 'p'>)^inv(x.604)
+    
+    25. gy    = x.598^(x.599*inv(x.600))
+        s     = s.305
+        x     = inv((x.599*x.604))
+        z     = x.598^inv((x.600*x.604))
+        z.1   = map(<s.305, 'p'>)^inv((x.599*x.604))
+    
+    26. gy    = x.598^(x.599*inv(x.600))
+        s     = s.305
+        x     = (x.600*x.604)
+        z     = x.598^(x.599*x.604)
+        z.1   = map(<s.305, 'p'>)^(x.600*x.604)
+    
+    27. gy    = x.598^(x.599*inv(x.600))
+        s     = s.305
+        x     = (x.600*x.604*inv(x.599))
+        z     = x.598^x.604
+        z.1   = map(<s.305, 'p'>)^(x.600*x.604*inv(x.599))
+    
+    28. gy    = x.598^(x.599*inv(x.600))
+        s     = s.305
+        x     = (x.600*inv((x.599*x.604)))
+        z     = x.598^inv(x.604)
+        z.1   = map(<s.305, 'p'>)^(x.600*inv((x.599*x.604)))
+    
+    29. gy    = x.599^inv((x.600*x.601))
+        s     = s.306
+        x     = (x.600*x.605*inv(x.606))
+        z     = x.599^(x.605*inv((x.601*x.606)))
+        z.1   = map(<s.306, 'p'>)^(x.600*x.605*inv(x.606))
+    
+    30. gy    = x.599^(x.600*x.601)
+        s     = s.306
+        x     = (x.605*inv((x.600*x.606)))
+        z     = x.599^(x.601*x.605*inv(x.606))
+        z.1   = map(<s.306, 'p'>)^(x.605*inv((x.600*x.606)))
+    
+    31. gy    = x.599^(x.600*x.601*inv(x.602))
+        s     = s.306
+        x     = inv((x.600*x.606))
+        z     = x.599^(x.601*inv((x.602*x.606)))
+        z.1   = map(<s.306, 'p'>)^inv((x.600*x.606))
+    
+    32. gy    = x.599^(x.600*x.601*inv(x.602))
+        s     = s.306
+        x     = (x.602*x.606*inv(x.600))
+        z     = x.599^(x.601*x.606)
+        z.1   = map(<s.306, 'p'>)^(x.602*x.606*inv(x.600))
+    
+    33. gy    = x.599^(x.600*x.601*inv(x.602))
+        s     = s.306
+        x     = (x.602*inv((x.600*x.606)))
+        z     = x.599^(x.601*inv(x.606))
+        z.1   = map(<s.306, 'p'>)^(x.602*inv((x.600*x.606)))
+    
+    34. gy    = x.599^(x.600*inv(x.601))
+        s     = s.306
+        x     = (x.601*x.605*inv((x.600*x.606)))
+        z     = x.599^(x.605*inv(x.606))
+        z.1   = map(<s.306, 'p'>)^(x.601*x.605*inv((x.600*x.606)))
+    
+    35. gy    = x.599^(x.600*inv(x.601))
+        s     = s.306
+        x     = (x.605*inv(x.606))
+        z     = x.599^(x.600*x.605*inv((x.601*x.606)))
+        z.1   = map(<s.306, 'p'>)^(x.605*inv(x.606))
+    
+    36. gy    = x.599^(x.600*inv(x.601))
+        s     = s.306
+        x     = (x.605*inv((x.600*x.606)))
+        z     = x.599^(x.605*inv((x.601*x.606)))
+        z.1   = map(<s.306, 'p'>)^(x.605*inv((x.600*x.606)))
+    
+    37. gy    = x.599^(x.600*inv((x.601*x.602)))
+        s     = s.306
+        x     = (x.601*x.606)
+        z     = x.599^(x.600*x.606*inv(x.602))
+        z.1   = map(<s.306, 'p'>)^(x.601*x.606)
+    
+    38. gy    = x.599^(x.600*inv((x.601*x.602)))
+        s     = s.306
+        x     = (x.601*x.606*inv(x.600))
+        z     = x.599^(x.606*inv(x.602))
+        z.1   = map(<s.306, 'p'>)^(x.601*x.606*inv(x.600))
+    
+    39. gy    = x.599^(x.600*inv((x.601*x.602)))
+        s     = s.306
+        x     = (x.601*inv(x.606))
+        z     = x.599^(x.600*inv((x.602*x.606)))
+        z.1   = map(<s.306, 'p'>)^(x.601*inv(x.606))
+    
+    40. gy    = x.599^(x.600*inv((x.601*x.602)))
+        s     = s.306
+        x     = (x.601*inv((x.600*x.606)))
+        z     = x.599^inv((x.602*x.606))
+        z.1   = map(<s.306, 'p'>)^(x.601*inv((x.600*x.606)))
+    
+    41. gy    = x.600^(x.601*x.602*inv(x.603))
+        s     = s.307
+        x     = (x.603*x.607*inv((x.601*x.608)))
+        z     = x.600^(x.602*x.607*inv(x.608))
+        z.1   = map(<s.307, 'p'>)^(x.603*x.607*inv((x.601*x.608)))
+    
+    42. gy    = x.600^(x.601*x.602*inv(x.603))
+        s     = s.307
+        x     = (x.607*inv((x.601*x.608)))
+        z     = x.600^(x.602*x.607*inv((x.603*x.608)))
+        z.1   = map(<s.307, 'p'>)^(x.607*inv((x.601*x.608)))
+    
+    43. gy    = x.600^(x.601*x.602*inv((x.603*x.604)))
+        s     = s.307
+        x     = (x.603*x.608*inv(x.601))
+        z     = x.600^(x.602*x.608*inv(x.604))
+        z.1   = map(<s.307, 'p'>)^(x.603*x.608*inv(x.601))
+    
+    44. gy    = x.600^(x.601*x.602*inv((x.603*x.604)))
+        s     = s.307
+        x     = (x.603*inv((x.601*x.608)))
+        z     = x.600^(x.602*inv((x.604*x.608)))
+        z.1   = map(<s.307, 'p'>)^(x.603*inv((x.601*x.608)))
+    
+    45. gy    = x.600^(x.601*inv((x.602*x.603)))
+        s     = s.307
+        x     = (x.602*x.607*inv(x.608))
+        z     = x.600^(x.601*x.607*inv((x.603*x.608)))
+        z.1   = map(<s.307, 'p'>)^(x.602*x.607*inv(x.608))
+    
+    46. gy    = x.600^(x.601*inv((x.602*x.603)))
+        s     = s.307
+        x     = (x.602*x.607*inv((x.601*x.608)))
+        z     = x.600^(x.607*inv((x.603*x.608)))
+        z.1   = map(<s.307, 'p'>)^(x.602*x.607*inv((x.601*x.608)))
+    
+    47. gy    = x.601^(x.602*x.603*inv((x.604*x.605)))
+        s     = s.308
+        x     = (x.604*x.609*inv((x.602*x.610)))
+        z     = x.601^(x.603*x.609*inv((x.605*x.610)))
+        z.1   = map(<s.308, 'p'>)^(x.604*x.609*inv((x.602*x.610)))
+  */
+
+rule (modulo E) B_3_Recv:
+   [
+   In( mac(<'A', 'B', map(<s, 'p'>)^y>, h(gx^y)) ),
+   St_B_3( $B, id, $A, sk_AB, gx, s, 'p', y )
+   ]
+  --[
+  Secret( $B, h(gx^y) ), Honest( $A ), Honest( $B ),
+  Commit( $B, $A, <'R', 'I', gx, map(<s, 'p'>)^y, h(gx^y)> ),
+  Receive_B_3( mac(<'A', 'B', map(<s, 'p'>)^y>, h(gx^y)) ),
+  Finish( $B )
+  ]->
+   [ St_B_4( $B, id, $A, sk_AB, gx, s, 'p', y, h(gx^y) ) ]
+
+  /*
+  rule (modulo AC) B_3_Recv:
+     [
+     In( <<'A', 'B', z.1>, senc(<'A', 'B', z.1>, h(z))> ),
+     St_B_3( $B, id, $A, sk_AB, gx, s, 'p', y )
+     ]
+    --[
+    Secret( $B, h(z) ), Honest( $A ), Honest( $B ),
+    Commit( $B, $A, <'R', 'I', gx, z.1, h(z)> ),
+    Receive_B_3( <<'A', 'B', z.1>, senc(<'A', 'B', z.1>, h(z))> ),
+    Finish( $B )
+    ]->
+     [ St_B_4( $B, id, $A, sk_AB, gx, s, 'p', y, h(z) ) ]
+    variants (modulo AC)
+     1. gx    = gx.30
+        s     = s.32
+        y     = one
+        z     = gx.30
+        z.1   = map(<s.32, 'p'>)
+    
+     2. gx    = gx.32
+        s     = s.34
+        y     = y.36
+        z     = gx.32^y.36
+        z.1   = map(<s.34, 'p'>)^y.36
+    
+     3. gx    = z.38^inv(y.35)
+        s     = s.33
+        y     = y.35
+        z     = z.38
+        z.1   = map(<s.33, 'p'>)^y.35
+    
+     4. gx    = z.305^x.594
+        s     = s.300
+        y     = inv(x.594)
+        z     = z.305
+        z.1   = map(<s.300, 'p'>)^inv(x.594)
+    
+     5. gx    = z.306^(x.595*inv(x.596))
+        s     = s.301
+        y     = (x.596*inv(x.595))
+        z     = z.306
+        z.1   = map(<s.301, 'p'>)^(x.596*inv(x.595))
+    
+     6. gx    = x.593^x.594
+        s     = s.300
+        y     = y.302
+        z     = x.593^(y.302*x.594)
+        z.1   = map(<s.300, 'p'>)^y.302
+    
+     7. gx    = x.593^(x.594*inv(y.302))
+        s     = s.300
+        y     = y.302
+        z     = x.593^x.594
+        z.1   = map(<s.300, 'p'>)^y.302
+    
+     8. gx    = x.594^inv((y.303*x.596))
+        s     = s.301
+        y     = y.303
+        z     = x.594^inv(x.596)
+        z.1   = map(<s.301, 'p'>)^y.303
+    
+     9. gx    = x.594^(x.595*x.596)
+        s     = s.301
+        y     = inv(x.595)
+        z     = x.594^x.596
+        z.1   = map(<s.301, 'p'>)^inv(x.595)
+    
+    10. gx    = x.595^(x.596*x.597*inv(x.598))
+        s     = s.302
+        y     = (x.598*inv(x.596))
+        z     = x.595^x.597
+        z.1   = map(<s.302, 'p'>)^(x.598*inv(x.596))
+    
+    11. gx    = x.595^(x.596*inv((y.304*x.598)))
+        s     = s.302
+        y     = y.304
+        z     = x.595^(x.596*inv(x.598))
+        z.1   = map(<s.302, 'p'>)^y.304
+    
+    12. gx    = x.595^(x.596*inv((x.597*x.598)))
+        s     = s.302
+        y     = (x.597*inv(x.596))
+        z     = x.595^inv(x.598)
+        z.1   = map(<s.302, 'p'>)^(x.597*inv(x.596))
+    
+    13. gx    = x.596^(x.597*x.598*inv((x.599*x.600)))
+        s     = s.303
+        y     = (x.599*inv(x.597))
+        z     = x.596^(x.598*inv(x.600))
+        z.1   = map(<s.303, 'p'>)^(x.599*inv(x.597))
+    
+    14. gx    = x.597^x.598
+        s     = s.304
+        y     = inv((x.598*x.602))
+        z     = x.597^inv(x.602)
+        z.1   = map(<s.304, 'p'>)^inv((x.598*x.602))
+    
+    15. gx    = x.597^x.598
+        s     = s.304
+        y     = (x.602*inv(x.598))
+        z     = x.597^x.602
+        z.1   = map(<s.304, 'p'>)^(x.602*inv(x.598))
+    
+    16. gx    = x.597^inv(x.598)
+        s     = s.304
+        y     = inv(x.602)
+        z     = x.597^inv((x.598*x.602))
+        z.1   = map(<s.304, 'p'>)^inv(x.602)
+    
+    17. gx    = x.597^inv(x.598)
+        s     = s.304
+        y     = (x.598*x.602)
+        z     = x.597^x.602
+        z.1   = map(<s.304, 'p'>)^(x.598*x.602)
+    
+    18. gx    = x.598^x.599
+        s     = s.305
+        y     = (x.603*inv((x.599*x.604)))
+        z     = x.598^(x.603*inv(x.604))
+        z.1   = map(<s.305, 'p'>)^(x.603*inv((x.599*x.604)))
+    
+    19. gx    = x.598^inv(x.599)
+        s     = s.305
+        y     = (x.603*inv(x.604))
+        z     = x.598^(x.603*inv((x.599*x.604)))
+        z.1   = map(<s.305, 'p'>)^(x.603*inv(x.604))
+    
+    20. gx    = x.598^inv((x.599*x.600))
+        s     = s.305
+        y     = (x.599*x.604)
+        z     = x.598^(x.604*inv(x.600))
+        z.1   = map(<s.305, 'p'>)^(x.599*x.604)
+    
+    21. gx    = x.598^inv((x.599*x.600))
+        s     = s.305
+        y     = (x.599*inv(x.604))
+        z     = x.598^inv((x.600*x.604))
+        z.1   = map(<s.305, 'p'>)^(x.599*inv(x.604))
+    
+    22. gx    = x.598^(x.599*x.600)
+        s     = s.305
+        y     = inv((x.599*x.604))
+        z     = x.598^(x.600*inv(x.604))
+        z.1   = map(<s.305, 'p'>)^inv((x.599*x.604))
+    
+    23. gx    = x.598^(x.599*x.600)
+        s     = s.305
+        y     = (x.604*inv(x.599))
+        z     = x.598^(x.600*x.604)
+        z.1   = map(<s.305, 'p'>)^(x.604*inv(x.599))
+    
+    24. gx    = x.598^(x.599*inv(x.600))
+        s     = s.305
+        y     = inv(x.604)
+        z     = x.598^(x.599*inv((x.600*x.604)))
+        z.1   = map(<s.305, 'p'>)^inv(x.604)
+    
+    25. gx    = x.598^(x.599*inv(x.600))
+        s     = s.305
+        y     = inv((x.599*x.604))
+        z     = x.598^inv((x.600*x.604))
+        z.1   = map(<s.305, 'p'>)^inv((x.599*x.604))
+    
+    26. gx    = x.598^(x.599*inv(x.600))
+        s     = s.305
+        y     = (x.600*x.604)
+        z     = x.598^(x.599*x.604)
+        z.1   = map(<s.305, 'p'>)^(x.600*x.604)
+    
+    27. gx    = x.598^(x.599*inv(x.600))
+        s     = s.305
+        y     = (x.600*x.604*inv(x.599))
+        z     = x.598^x.604
+        z.1   = map(<s.305, 'p'>)^(x.600*x.604*inv(x.599))
+    
+    28. gx    = x.598^(x.599*inv(x.600))
+        s     = s.305
+        y     = (x.600*inv((x.599*x.604)))
+        z     = x.598^inv(x.604)
+        z.1   = map(<s.305, 'p'>)^(x.600*inv((x.599*x.604)))
+    
+    29. gx    = x.599^inv((x.600*x.601))
+        s     = s.306
+        y     = (x.600*x.605*inv(x.606))
+        z     = x.599^(x.605*inv((x.601*x.606)))
+        z.1   = map(<s.306, 'p'>)^(x.600*x.605*inv(x.606))
+    
+    30. gx    = x.599^(x.600*x.601)
+        s     = s.306
+        y     = (x.605*inv((x.600*x.606)))
+        z     = x.599^(x.601*x.605*inv(x.606))
+        z.1   = map(<s.306, 'p'>)^(x.605*inv((x.600*x.606)))
+    
+    31. gx    = x.599^(x.600*x.601*inv(x.602))
+        s     = s.306
+        y     = inv((x.600*x.606))
+        z     = x.599^(x.601*inv((x.602*x.606)))
+        z.1   = map(<s.306, 'p'>)^inv((x.600*x.606))
+    
+    32. gx    = x.599^(x.600*x.601*inv(x.602))
+        s     = s.306
+        y     = (x.602*x.606*inv(x.600))
+        z     = x.599^(x.601*x.606)
+        z.1   = map(<s.306, 'p'>)^(x.602*x.606*inv(x.600))
+    
+    33. gx    = x.599^(x.600*x.601*inv(x.602))
+        s     = s.306
+        y     = (x.602*inv((x.600*x.606)))
+        z     = x.599^(x.601*inv(x.606))
+        z.1   = map(<s.306, 'p'>)^(x.602*inv((x.600*x.606)))
+    
+    34. gx    = x.599^(x.600*inv(x.601))
+        s     = s.306
+        y     = (x.601*x.605*inv((x.600*x.606)))
+        z     = x.599^(x.605*inv(x.606))
+        z.1   = map(<s.306, 'p'>)^(x.601*x.605*inv((x.600*x.606)))
+    
+    35. gx    = x.599^(x.600*inv(x.601))
+        s     = s.306
+        y     = (x.605*inv(x.606))
+        z     = x.599^(x.600*x.605*inv((x.601*x.606)))
+        z.1   = map(<s.306, 'p'>)^(x.605*inv(x.606))
+    
+    36. gx    = x.599^(x.600*inv(x.601))
+        s     = s.306
+        y     = (x.605*inv((x.600*x.606)))
+        z     = x.599^(x.605*inv((x.601*x.606)))
+        z.1   = map(<s.306, 'p'>)^(x.605*inv((x.600*x.606)))
+    
+    37. gx    = x.599^(x.600*inv((x.601*x.602)))
+        s     = s.306
+        y     = (x.601*x.606)
+        z     = x.599^(x.600*x.606*inv(x.602))
+        z.1   = map(<s.306, 'p'>)^(x.601*x.606)
+    
+    38. gx    = x.599^(x.600*inv((x.601*x.602)))
+        s     = s.306
+        y     = (x.601*x.606*inv(x.600))
+        z     = x.599^(x.606*inv(x.602))
+        z.1   = map(<s.306, 'p'>)^(x.601*x.606*inv(x.600))
+    
+    39. gx    = x.599^(x.600*inv((x.601*x.602)))
+        s     = s.306
+        y     = (x.601*inv(x.606))
+        z     = x.599^(x.600*inv((x.602*x.606)))
+        z.1   = map(<s.306, 'p'>)^(x.601*inv(x.606))
+    
+    40. gx    = x.599^(x.600*inv((x.601*x.602)))
+        s     = s.306
+        y     = (x.601*inv((x.600*x.606)))
+        z     = x.599^inv((x.602*x.606))
+        z.1   = map(<s.306, 'p'>)^(x.601*inv((x.600*x.606)))
+    
+    41. gx    = x.600^(x.601*x.602*inv(x.603))
+        s     = s.307
+        y     = (x.603*x.607*inv((x.601*x.608)))
+        z     = x.600^(x.602*x.607*inv(x.608))
+        z.1   = map(<s.307, 'p'>)^(x.603*x.607*inv((x.601*x.608)))
+    
+    42. gx    = x.600^(x.601*x.602*inv(x.603))
+        s     = s.307
+        y     = (x.607*inv((x.601*x.608)))
+        z     = x.600^(x.602*x.607*inv((x.603*x.608)))
+        z.1   = map(<s.307, 'p'>)^(x.607*inv((x.601*x.608)))
+    
+    43. gx    = x.600^(x.601*x.602*inv((x.603*x.604)))
+        s     = s.307
+        y     = (x.603*x.608*inv(x.601))
+        z     = x.600^(x.602*x.608*inv(x.604))
+        z.1   = map(<s.307, 'p'>)^(x.603*x.608*inv(x.601))
+    
+    44. gx    = x.600^(x.601*x.602*inv((x.603*x.604)))
+        s     = s.307
+        y     = (x.603*inv((x.601*x.608)))
+        z     = x.600^(x.602*inv((x.604*x.608)))
+        z.1   = map(<s.307, 'p'>)^(x.603*inv((x.601*x.608)))
+    
+    45. gx    = x.600^(x.601*inv((x.602*x.603)))
+        s     = s.307
+        y     = (x.602*x.607*inv(x.608))
+        z     = x.600^(x.601*x.607*inv((x.603*x.608)))
+        z.1   = map(<s.307, 'p'>)^(x.602*x.607*inv(x.608))
+    
+    46. gx    = x.600^(x.601*inv((x.602*x.603)))
+        s     = s.307
+        y     = (x.602*x.607*inv((x.601*x.608)))
+        z     = x.600^(x.607*inv((x.603*x.608)))
+        z.1   = map(<s.307, 'p'>)^(x.602*x.607*inv((x.601*x.608)))
+    
+    47. gx    = x.601^(x.602*x.603*inv((x.604*x.605)))
+        s     = s.308
+        y     = (x.604*x.609*inv((x.602*x.610)))
+        z     = x.601^(x.603*x.609*inv((x.605*x.610)))
+        z.1   = map(<s.308, 'p'>)^(x.604*x.609*inv((x.602*x.610)))
+  */
+
+rule (modulo E) B_4_Send:
+   [ St_B_4( $B, id, $A, sk_AB, gx, s, 'p', y, Kab ) ]
+  --[
+  Running( $B, $A, <'I', 'R', gx, map(<s, 'p'>)^y, Kab> ),
+  Send_B_4( mac(<'B', 'A', gx>, Kab) )
+  ]->
+   [
+   Out( mac(<'B', 'A', gx>, Kab) ),
+   St_B_5( $B, id, $A, sk_AB, gx, s, 'p', y, Kab )
+   ]
+
+  /*
+  rule (modulo AC) B_4_Send:
+     [ St_B_4( $B, id, $A, sk_AB, gx, s, 'p', y, Kab ) ]
+    --[
+    Running( $B, $A, <'I', 'R', gx, z, Kab> ),
+    Send_B_4( <<'B', 'A', gx>, senc(<'B', 'A', gx>, Kab)> )
+    ]->
+     [
+     Out( <<'B', 'A', gx>, senc(<'B', 'A', gx>, Kab)> ),
+     St_B_5( $B, id, $A, sk_AB, gx, s, 'p', y, Kab )
+     ]
+    variants (modulo AC)
+    1. s     = s.19
+       y     = one
+       z     = map(<s.19, 'p'>)
+    
+    2. s     = s.21
+       y     = y.23
+       z     = map(<s.21, 'p'>)^y.23
+  */
+
+rule (modulo E) A_4_Recv:
+   [
+   In( mac(<'B', 'A', map(<s, 'p'>)^x>, Kab) ),
+   St_A_4( $A, id, $B, sk_AB, x, s, 'p', gy, Kab )
+   ]
+  --[
+  Secret( $A, Kab ), Honest( $A ), Honest( $B ),
+  Commit( $A, $B, <'I', 'R', map(<s, 'p'>)^x, gy, Kab> ),
+  Receive_A_4( mac(<'B', 'A', map(<s, 'p'>)^x>, Kab) ), Finish( $A )
+  ]->
+   [ St_A_5( $A, id, $B, sk_AB, x, s, 'p', gy, Kab ) ]
+
+  /*
+  rule (modulo AC) A_4_Recv:
+     [
+     In( <<'B', 'A', z>, senc(<'B', 'A', z>, Kab)> ),
+     St_A_4( $A, id, $B, sk_AB, x, s, 'p', gy, Kab )
+     ]
+    --[
+    Secret( $A, Kab ), Honest( $A ), Honest( $B ),
+    Commit( $A, $B, <'I', 'R', z, gy, Kab> ),
+    Receive_A_4( <<'B', 'A', z>, senc(<'B', 'A', z>, Kab)> ),
+    Finish( $A )
+    ]->
+     [ St_A_5( $A, id, $B, sk_AB, x, s, 'p', gy, Kab ) ]
+    variants (modulo AC)
+    1. s     = s.15
+       x     = one
+       z     = map(<s.15, 'p'>)
+    
+    2. s     = s.17
+       x     = x.19
+       z     = map(<s.17, 'p'>)^x.19
+  */
+
+lemma executable:
+  exists-trace
+  "∃ A B #i #j.
+    (((((Finish( A ) @ #i) ∧ (Finish( B ) @ #j)) ∧ (¬(A = B))) ∧
+      (¬(∃ X #r. Reveal( X ) @ #r))) ∧
+     (∀ A.1 B.1 id1 id2 #i.1 #j.1.
+       ((Create( A.1, id1, 'A' ) @ #i.1) ∧
+        (Create( B.1, id2, 'A' ) @ #j.1)) ⇒
+       ((A.1 = B.1) ∧ (id1 = id2)))) ∧
+    (∀ A.1 B.1 id1 id2 #i.1 #j.1.
+      ((Create( A.1, id1, 'B' ) @ #i.1) ∧
+       (Create( B.1, id2, 'B' ) @ #j.1)) ⇒
+      ((A.1 = B.1) ∧ (id1 = id2)))"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ A B #i #j.
+  (Finish( A ) @ #i) ∧ (Finish( B ) @ #j)
+ ∧
+  (¬(A = B)) ∧
+  (∀ X #r. (Reveal( X ) @ #r) ⇒ ⊥) ∧
+  (∀ A.1 B.1 id1 id2 #i.1 #j.1.
+    (Create( A.1, id1, 'A' ) @ #i.1) ∧ (Create( B.1, id2, 'A' ) @ #j.1)
+   ⇒
+    (A.1 = B.1) ∧ (id1 = id2)) ∧
+  (∀ A.1 B.1 id1 id2 #i.1 #j.1.
+    (Create( A.1, id1, 'B' ) @ #i.1) ∧ (Create( B.1, id2, 'B' ) @ #j.1)
+   ⇒
+    (A.1 = B.1) ∧ (id1 = id2))"
+*/
+simplify
+solve( Finish( A ) @ #i )
+  case A_4_Recv
+  solve( St_A_4( $A, id, $B, sk_AB, x, s, 'p', gy, Kab ) ▶₁ #i )
+    case A_3_Send
+    solve( Finish( B.1 ) @ #j )
+      case B_3_Recv
+      solve( St_B_3( $B.1, id.1, $A.1, sk_AB, gx, s.1, 'p', y ) ▶₁ #j )
+        case B_2_Send
+        solve( !KU( senc(<'B', 'A', map(<~s, 'p'>)^~x>, h(z)) ) @ #vk.9 )
+          case B_4_Send
+          solve( !KU( senc(<'A', 'B', map(<s.1, 'p'>)^~y>,
+                           h(map(<~s, 'p'>)^(~x*~y)))
+                 ) @ #vk.13 )
+            case A_3_Send
+            solve( !KU( senc(~s, h(~sk.1)) ) @ #vk.14 )
+              case A_1_Send
+              solve( !KU( map(<~s, 'p'>)^~x ) @ #vk.11 )
+                case A_1_Send
+                solve( !KU( map(<~s, 'p'>)^~y ) @ #vk.14 )
+                  case B_2_Send
+                  SOLVED // trace found
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma secrecy:
+  all-traces
+  "∀ A x #i.
+    (Secret( A, x ) @ #i) ⇒
+    ((¬(∃ #j. K( x ) @ #j)) ∨
+     (∃ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ A x #i.
+  (Secret( A, x ) @ #i)
+ ∧
+  (∃ #j. (K( x ) @ #j)) ∧
+  (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
+*/
+simplify
+solve( Secret( A, x ) @ #i )
+  case A_4_Recv
+  solve( St_A_4( $A, id, $B, sk_AB, x.1, s, 'p', gy, x ) ▶₁ #i )
+    case A_3_Send
+    solve( !KU( senc(<'B', 'A', map(<~s, 'p'>)^~x>, h(z)) ) @ #vk.7 )
+      case B_4_Send
+      solve( !KU( h(map(<~s, 'p'>)^(~x*~y)) ) @ #vk.1 )
+        case c_h
+        solve( !KU( map(<~s, 'p'>)^(~x*~y) ) @ #vk.18 )
+          case A_1_Send_case_1
+          by solve( !KU( ~y ) @ #vk.19 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x ) @ #vk.22 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~x ) @ #vk.18 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~y.1 ) @ #vk.23 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.21 )
+        qed
+      qed
+    next
+      case c_senc
+      solve( splitEqs(1) )
+        case split_case_1
+        solve( !KU( h(gy^~x) ) @ #vk.2 )
+          case c_h
+          solve( !KU( gy^~x ) @ #vk.9 )
+            case A_1_Send_case_1
+            solve( !KU( map(<~s, 'p'>) ) @ #vk.8 )
+              case A_1_Send
+              by solve( !KU( ~x ) @ #vk.10 )
+            next
+              case B_2_Send
+              by solve( !KU( ~y ) @ #vk.10 )
+            next
+              case c_map
+              solve( !KU( ~s ) @ #vk.10 )
+                case A_1_Send
+                solve( !KU( ~sk ) @ #vk.13 )
+                  case Reveal_A
+                  by contradiction /* from formulas */
+                next
+                  case Reveal_B
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case B_2_Send
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case c_exp
+            by solve( !KU( ~x ) @ #vk.10 )
+          qed
+        qed
+      next
+        case split_case_2
+        solve( !KU( z^inv(~x) ) @ #vk.8 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x.1 ) @ #vk.11 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x.1 ) @ #vk.12 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~y ) @ #vk.11 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.11 )
+        qed
+      next
+        case split_case_3
+        solve( !KU( h(x.1^(~x*x.2)) ) @ #vk.2 )
+          case c_h
+          solve( !KU( x.1^(~x*x.2) ) @ #vk.9 )
+            case A_1_Send_case_1
+            by solve( !KU( ~x ) @ #vk.10 )
+          next
+            case A_1_Send_case_2
+            solve( !KU( map(<~s, 'p'>)^x.1 ) @ #vk.9 )
+              case A_1_Send_case_1
+              by solve( !KU( ~x ) @ #vk.9 )
+            next
+              case A_1_Send_case_2
+              by solve( !KU( ~x ) @ #vk.12 )
+            next
+              case A_1_Send_case_3
+              by solve( !KU( ~x ) @ #vk.13 )
+            next
+              case A_1_Send_case_4
+              by solve( !KU( ~x ) @ #vk.13 )
+            next
+              case A_1_Send_case_5
+              by solve( !KU( ~x ) @ #vk.15 )
+            next
+              case B_2_Send_case_1
+              by solve( !KU( ~y ) @ #vk.10 )
+            next
+              case B_2_Send_case_2
+              by solve( !KU( ~y ) @ #vk.17 )
+            next
+              case B_2_Send_case_3
+              by solve( !KU( ~y ) @ #vk.13 )
+            next
+              case B_2_Send_case_4
+              by solve( !KU( ~y ) @ #vk.13 )
+            next
+              case B_2_Send_case_5
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case c_exp
+              solve( !KU( map(<~s, 'p'>) ) @ #vk.11 )
+                case A_1_Send
+                by solve( !KU( ~x ) @ #vk.13 )
+              next
+                case B_2_Send
+                by solve( !KU( ~y ) @ #vk.13 )
+              next
+                case c_map
+                solve( !KU( ~s ) @ #vk.13 )
+                  case A_1_Send
+                  solve( !KU( ~sk ) @ #vk.16 )
+                    case Reveal_A
+                    by contradiction /* from formulas */
+                  next
+                    case Reveal_B
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          next
+            case A_1_Send_case_3
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case A_1_Send_case_4
+            by solve( !KU( ~x.2 ) @ #vk.13 )
+          next
+            case A_1_Send_case_5
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case A_1_Send_case_6
+            by solve( !KU( ~x.3 ) @ #vk.14 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~x ) @ #vk.10 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~x ) @ #vk.16 )
+          next
+            case B_2_Send_case_3
+            by solve( !KU( ~y ) @ #vk.13 )
+          next
+            case B_2_Send_case_4
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case B_2_Send_case_5
+            by solve( !KU( ~y ) @ #vk.14 )
+          next
+            case c_exp
+            by solve( !KU( ~x ) @ #vk.12 )
+          qed
+        qed
+      next
+        case split_case_4
+        solve( !KU( x.1^(x.2*inv(~x)) ) @ #vk.8 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x ) @ #vk.10 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x ) @ #vk.12 )
+        next
+          case A_1_Send_case_3
+          by solve( !KU( ~x.2 ) @ #vk.12 )
+        next
+          case A_1_Send_case_4
+          by solve( !KU( ~x.2 ) @ #vk.13 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~x ) @ #vk.15 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~x ) @ #vk.17 )
+        next
+          case B_2_Send_case_3
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case B_2_Send_case_4
+          by solve( !KU( ~y ) @ #vk.13 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.13 )
+        qed
+      next
+        case split_case_5
+        solve( !KU( x.1^inv((~x*x.2)) ) @ #vk.8 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x.2 ) @ #vk.11 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x.2 ) @ #vk.12 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~y ) @ #vk.11 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.12 )
+        qed
+      next
+        case split_case_6
+        solve( !KU( x.1^(x.2*inv((~x*x.3))) ) @ #vk.8 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x ) @ #vk.11 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x ) @ #vk.13 )
+        next
+          case A_1_Send_case_3
+          by solve( !KU( ~x.3 ) @ #vk.12 )
+        next
+          case A_1_Send_case_4
+          by solve( !KU( ~x.3 ) @ #vk.13 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~x ) @ #vk.16 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~x ) @ #vk.18 )
+        next
+          case B_2_Send_case_3
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case B_2_Send_case_4
+          by solve( !KU( ~y ) @ #vk.13 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.14 )
+        qed
+      qed
+    qed
+  qed
+next
+  case B_3_Recv
+  solve( St_B_3( $B, id, $A, sk_AB, gx, s, 'p', y ) ▶₁ #i )
+    case B_2_Send
+    solve( !KU( senc(<'A', 'B', map(<s, 'p'>)^~y>, h(z)) ) @ #vk.7 )
+      case A_3_Send
+      solve( !KU( h(map(<s, 'p'>)^(~x*~y)) ) @ #vk.1 )
+        case c_h
+        solve( !KU( map(<s, 'p'>)^(~x*~y) ) @ #vk.13 )
+          case A_1_Send_case_1
+          by solve( !KU( ~y ) @ #vk.14 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x.1 ) @ #vk.17 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~x ) @ #vk.14 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~y.1 ) @ #vk.18 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.16 )
+        qed
+      qed
+    next
+      case c_senc
+      solve( !KU( senc(s, h(~sk)) ) @ #vk.11 )
+        case A_1_Send
+        solve( splitEqs(0) )
+          case split_case_1
+          solve( !KU( h(gx^~y) ) @ #vk.4 )
+            case c_h
+            solve( !KU( gx^~y ) @ #vk.13 )
+              case A_1_Send
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case B_2_Send_case_1
+              solve( !KU( map(<~s, 'p'>) ) @ #vk.11 )
+                case A_1_Send
+                by solve( !KU( ~x ) @ #vk.14 )
+              next
+                case B_2_Send
+                by solve( !KU( ~y.1 ) @ #vk.15 )
+              next
+                case c_map
+                solve( !KU( ~s ) @ #vk.14 )
+                  case A_1_Send
+                  solve( !KU( ~sk ) @ #vk.16 )
+                    case Reveal_A
+                    by contradiction /* from formulas */
+                  next
+                    case Reveal_B
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            next
+              case B_2_Send_case_2
+              by solve( !KU( ~y ) @ #vk.16 )
+            next
+              case c_exp
+              by solve( !KU( ~y ) @ #vk.14 )
+            qed
+          qed
+        next
+          case split_case_2
+          solve( !KU( z^inv(~y) ) @ #vk.11 )
+            case A_1_Send_case_1
+            by solve( !KU( ~x.1 ) @ #vk.15 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~x.1 ) @ #vk.16 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y.1 ) @ #vk.16 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.15 )
+          qed
+        next
+          case split_case_3
+          solve( !KU( h(x^(~y*x.1)) ) @ #vk.4 )
+            case c_h
+            solve( !KU( x^(~y*x.1) ) @ #vk.13 )
+              case A_1_Send_case_1
+              by solve( !KU( ~y ) @ #vk.14 )
+            next
+              case A_1_Send_case_2
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case A_1_Send_case_3
+              by solve( !KU( ~x.2 ) @ #vk.17 )
+            next
+              case A_1_Send_case_4
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case A_1_Send_case_5
+              by solve( !KU( ~x.3 ) @ #vk.18 )
+            next
+              case B_2_Send_case_1
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case B_2_Send_case_2
+              solve( !KU( map(<~s, 'p'>)^x ) @ #vk.12 )
+                case A_1_Send_case_1
+                by solve( !KU( ~x ) @ #vk.14 )
+              next
+                case A_1_Send_case_2
+                by solve( !KU( ~x ) @ #vk.16 )
+              next
+                case A_1_Send_case_3
+                by solve( !KU( ~x.1 ) @ #vk.17 )
+              next
+                case A_1_Send_case_4
+                by solve( !KU( ~x.1 ) @ #vk.17 )
+              next
+                case A_1_Send_case_5
+                by solve( !KU( ~x.2 ) @ #vk.19 )
+              next
+                case B_2_Send_case_1
+                by solve( !KU( ~y.1 ) @ #vk.15 )
+              next
+                case B_2_Send_case_2
+                by solve( !KU( ~y.1 ) @ #vk.20 )
+              next
+                case B_2_Send_case_3
+                by solve( !KU( ~y.1 ) @ #vk.18 )
+              next
+                case B_2_Send_case_4
+                by solve( !KU( ~y.1 ) @ #vk.18 )
+              next
+                case B_2_Send_case_5
+                by solve( !KU( ~y.1 ) @ #vk.20 )
+              next
+                case c_exp
+                solve( !KU( map(<~s, 'p'>) ) @ #vk.15 )
+                  case A_1_Send
+                  by solve( !KU( ~x.1 ) @ #vk.17 )
+                next
+                  case B_2_Send
+                  by solve( !KU( ~y.1 ) @ #vk.18 )
+                next
+                  case c_map
+                  solve( !KU( ~s ) @ #vk.17 )
+                    case A_1_Send
+                    solve( !KU( ~sk ) @ #vk.19 )
+                      case Reveal_A
+                      by contradiction /* from formulas */
+                    next
+                      case Reveal_B
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              qed
+            next
+              case B_2_Send_case_3
+              by solve( !KU( ~y ) @ #vk.19 )
+            next
+              case B_2_Send_case_4
+              by solve( !KU( ~y.1 ) @ #vk.18 )
+            next
+              case B_2_Send_case_5
+              by solve( !KU( ~y ) @ #vk.16 )
+            next
+              case B_2_Send_case_6
+              by solve( !KU( ~y.1 ) @ #vk.19 )
+            next
+              case c_exp
+              by solve( !KU( ~y ) @ #vk.16 )
+            qed
+          qed
+        next
+          case split_case_4
+          solve( !KU( x^(x.1*inv(~y)) ) @ #vk.11 )
+            case A_1_Send_case_1
+            by solve( !KU( ~y ) @ #vk.14 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~y ) @ #vk.16 )
+          next
+            case A_1_Send_case_3
+            by solve( !KU( ~x.2 ) @ #vk.16 )
+          next
+            case A_1_Send_case_4
+            by solve( !KU( ~x.2 ) @ #vk.17 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y ) @ #vk.18 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y ) @ #vk.20 )
+          next
+            case B_2_Send_case_3
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case B_2_Send_case_4
+            by solve( !KU( ~y.1 ) @ #vk.18 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.17 )
+          qed
+        next
+          case split_case_5
+          solve( !KU( x^inv((~y*x.1)) ) @ #vk.11 )
+            case A_1_Send_case_1
+            by solve( !KU( ~x.2 ) @ #vk.15 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~x.2 ) @ #vk.16 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y.1 ) @ #vk.16 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.16 )
+          qed
+        next
+          case split_case_6
+          solve( !KU( x^(x.1*inv((~y*x.2))) ) @ #vk.11 )
+            case A_1_Send_case_1
+            by solve( !KU( ~y ) @ #vk.15 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~y ) @ #vk.17 )
+          next
+            case A_1_Send_case_3
+            by solve( !KU( ~x.3 ) @ #vk.16 )
+          next
+            case A_1_Send_case_4
+            by solve( !KU( ~x.3 ) @ #vk.17 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y ) @ #vk.19 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y ) @ #vk.21 )
+          next
+            case B_2_Send_case_3
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case B_2_Send_case_4
+            by solve( !KU( ~y.1 ) @ #vk.18 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.18 )
+          qed
+        qed
+      next
+        case A_3_Send
+        solve( !KU( ~sk^inv(~x) ) @ #vk.13 )
+          case c_exp
+          solve( !KU( ~sk ) @ #vk.14 )
+            case Reveal_A
+            by contradiction /* from formulas */
+          next
+            case Reveal_B
+            by contradiction /* from formulas */
+          qed
+        qed
+      next
+        case B_4_Send
+        solve( !KU( senc(<'A', 'B', map(<s, 'p'>)^~y>, h(~sk)) ) @ #vk.18 )
+          case c_senc
+          solve( !KU( h(~sk) ) @ #vk.22 )
+            case c_h
+            solve( !KU( ~sk ) @ #vk.23 )
+              case Reveal_A
+              by contradiction /* from formulas */
+            next
+              case Reveal_B
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      next
+        case c_senc
+        solve( !KU( h(~sk) ) @ #vk.14 )
+          case c_h
+          solve( !KU( ~sk ) @ #vk.15 )
+            case Reveal_A
+            by contradiction /* from formulas */
+          next
+            case Reveal_B
+            by contradiction /* from formulas */
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma secrecy_PFS:
+  all-traces
+  "∀ A x #i.
+    (Secret( A, x ) @ #i) ⇒
+    ((¬(∃ #j. K( x ) @ #j)) ∨
+     (∃ X #r. ((Reveal( X ) @ #r) ∧ (Honest( X ) @ #i)) ∧ (#r < #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ A x #i.
+  (Secret( A, x ) @ #i)
+ ∧
+  (∃ #j. (K( x ) @ #j)) ∧
+  (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ¬(#r < #i))"
+*/
+simplify
+solve( Secret( A, x ) @ #i )
+  case A_4_Recv
+  solve( St_A_4( $A, id, $B, sk_AB, x.1, s, 'p', gy, x ) ▶₁ #i )
+    case A_3_Send
+    solve( !KU( senc(<'B', 'A', map(<~s, 'p'>)^~x>, h(z)) ) @ #vk.7 )
+      case B_4_Send
+      solve( !KU( h(map(<~s, 'p'>)^(~x*~y)) ) @ #vk.1 )
+        case c_h
+        solve( !KU( map(<~s, 'p'>)^(~x*~y) ) @ #vk.18 )
+          case A_1_Send_case_1
+          by solve( !KU( ~y ) @ #vk.19 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x ) @ #vk.22 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~x ) @ #vk.18 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~y.1 ) @ #vk.23 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.21 )
+        qed
+      qed
+    next
+      case c_senc
+      solve( splitEqs(1) )
+        case split_case_1
+        solve( !KU( h(gy^~x) ) @ #vk.2 )
+          case c_h
+          solve( !KU( gy^~x ) @ #vk.9 )
+            case A_1_Send_case_1
+            solve( !KU( map(<~s, 'p'>) ) @ #vk.8 )
+              case A_1_Send
+              by solve( !KU( ~x ) @ #vk.10 )
+            next
+              case B_2_Send
+              by solve( !KU( ~y ) @ #vk.10 )
+            next
+              case c_map
+              solve( !KU( ~s ) @ #vk.10 )
+                case A_1_Send
+                solve( !KU( ~sk ) @ #vk.13 )
+                  case Reveal_A
+                  by contradiction /* from formulas */
+                next
+                  case Reveal_B
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case B_2_Send
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case c_exp
+            by solve( !KU( ~x ) @ #vk.10 )
+          qed
+        qed
+      next
+        case split_case_2
+        solve( !KU( z^inv(~x) ) @ #vk.8 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x.1 ) @ #vk.11 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x.1 ) @ #vk.12 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~y ) @ #vk.11 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.11 )
+        qed
+      next
+        case split_case_3
+        solve( !KU( h(x.1^(~x*x.2)) ) @ #vk.2 )
+          case c_h
+          solve( !KU( x.1^(~x*x.2) ) @ #vk.9 )
+            case A_1_Send_case_1
+            by solve( !KU( ~x ) @ #vk.10 )
+          next
+            case A_1_Send_case_2
+            solve( !KU( map(<~s, 'p'>)^x.1 ) @ #vk.9 )
+              case A_1_Send_case_1
+              by solve( !KU( ~x ) @ #vk.9 )
+            next
+              case A_1_Send_case_2
+              by solve( !KU( ~x ) @ #vk.12 )
+            next
+              case A_1_Send_case_3
+              by solve( !KU( ~x ) @ #vk.13 )
+            next
+              case A_1_Send_case_4
+              by solve( !KU( ~x ) @ #vk.13 )
+            next
+              case A_1_Send_case_5
+              by solve( !KU( ~x ) @ #vk.15 )
+            next
+              case B_2_Send_case_1
+              by solve( !KU( ~y ) @ #vk.10 )
+            next
+              case B_2_Send_case_2
+              by solve( !KU( ~y ) @ #vk.17 )
+            next
+              case B_2_Send_case_3
+              by solve( !KU( ~y ) @ #vk.13 )
+            next
+              case B_2_Send_case_4
+              by solve( !KU( ~y ) @ #vk.13 )
+            next
+              case B_2_Send_case_5
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case c_exp
+              solve( !KU( map(<~s, 'p'>) ) @ #vk.11 )
+                case A_1_Send
+                by solve( !KU( ~x ) @ #vk.13 )
+              next
+                case B_2_Send
+                by solve( !KU( ~y ) @ #vk.13 )
+              next
+                case c_map
+                solve( !KU( ~s ) @ #vk.13 )
+                  case A_1_Send
+                  solve( !KU( ~sk ) @ #vk.16 )
+                    case Reveal_A
+                    by contradiction /* from formulas */
+                  next
+                    case Reveal_B
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          next
+            case A_1_Send_case_3
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case A_1_Send_case_4
+            by solve( !KU( ~x.2 ) @ #vk.13 )
+          next
+            case A_1_Send_case_5
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case A_1_Send_case_6
+            by solve( !KU( ~x.3 ) @ #vk.14 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~x ) @ #vk.10 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~x ) @ #vk.16 )
+          next
+            case B_2_Send_case_3
+            by solve( !KU( ~y ) @ #vk.13 )
+          next
+            case B_2_Send_case_4
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case B_2_Send_case_5
+            by solve( !KU( ~y ) @ #vk.14 )
+          next
+            case c_exp
+            by solve( !KU( ~x ) @ #vk.12 )
+          qed
+        qed
+      next
+        case split_case_4
+        solve( !KU( x.1^(x.2*inv(~x)) ) @ #vk.8 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x ) @ #vk.10 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x ) @ #vk.12 )
+        next
+          case A_1_Send_case_3
+          by solve( !KU( ~x.2 ) @ #vk.12 )
+        next
+          case A_1_Send_case_4
+          by solve( !KU( ~x.2 ) @ #vk.13 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~x ) @ #vk.15 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~x ) @ #vk.17 )
+        next
+          case B_2_Send_case_3
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case B_2_Send_case_4
+          by solve( !KU( ~y ) @ #vk.13 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.13 )
+        qed
+      next
+        case split_case_5
+        solve( !KU( x.1^inv((~x*x.2)) ) @ #vk.8 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x.2 ) @ #vk.11 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x.2 ) @ #vk.12 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~y ) @ #vk.11 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.12 )
+        qed
+      next
+        case split_case_6
+        solve( !KU( x.1^(x.2*inv((~x*x.3))) ) @ #vk.8 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x ) @ #vk.11 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x ) @ #vk.13 )
+        next
+          case A_1_Send_case_3
+          by solve( !KU( ~x.3 ) @ #vk.12 )
+        next
+          case A_1_Send_case_4
+          by solve( !KU( ~x.3 ) @ #vk.13 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~x ) @ #vk.16 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~x ) @ #vk.18 )
+        next
+          case B_2_Send_case_3
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case B_2_Send_case_4
+          by solve( !KU( ~y ) @ #vk.13 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.14 )
+        qed
+      qed
+    qed
+  qed
+next
+  case B_3_Recv
+  solve( St_B_3( $B, id, $A, sk_AB, gx, s, 'p', y ) ▶₁ #i )
+    case B_2_Send
+    solve( !KU( senc(<'A', 'B', map(<s, 'p'>)^~y>, h(z)) ) @ #vk.7 )
+      case A_3_Send
+      solve( !KU( h(map(<s, 'p'>)^(~x*~y)) ) @ #vk.1 )
+        case c_h
+        solve( !KU( map(<s, 'p'>)^(~x*~y) ) @ #vk.13 )
+          case A_1_Send_case_1
+          by solve( !KU( ~y ) @ #vk.14 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x.1 ) @ #vk.17 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~x ) @ #vk.14 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~y.1 ) @ #vk.18 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.16 )
+        qed
+      qed
+    next
+      case c_senc
+      solve( !KU( senc(s, h(~sk)) ) @ #vk.11 )
+        case A_1_Send
+        solve( splitEqs(0) )
+          case split_case_1
+          solve( !KU( h(gx^~y) ) @ #vk.4 )
+            case c_h
+            solve( !KU( gx^~y ) @ #vk.13 )
+              case A_1_Send
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case B_2_Send_case_1
+              solve( !KU( map(<~s, 'p'>) ) @ #vk.11 )
+                case A_1_Send
+                by solve( !KU( ~x ) @ #vk.14 )
+              next
+                case B_2_Send
+                by solve( !KU( ~y.1 ) @ #vk.15 )
+              next
+                case c_map
+                solve( !KU( ~s ) @ #vk.14 )
+                  case A_1_Send
+                  solve( !KU( ~sk ) @ #vk.16 )
+                    case Reveal_A
+                    by contradiction /* from formulas */
+                  next
+                    case Reveal_B
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            next
+              case B_2_Send_case_2
+              by solve( !KU( ~y ) @ #vk.16 )
+            next
+              case c_exp
+              by solve( !KU( ~y ) @ #vk.14 )
+            qed
+          qed
+        next
+          case split_case_2
+          solve( !KU( z^inv(~y) ) @ #vk.11 )
+            case A_1_Send_case_1
+            by solve( !KU( ~x.1 ) @ #vk.15 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~x.1 ) @ #vk.16 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y.1 ) @ #vk.16 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.15 )
+          qed
+        next
+          case split_case_3
+          solve( !KU( h(x^(~y*x.1)) ) @ #vk.4 )
+            case c_h
+            solve( !KU( x^(~y*x.1) ) @ #vk.13 )
+              case A_1_Send_case_1
+              by solve( !KU( ~y ) @ #vk.14 )
+            next
+              case A_1_Send_case_2
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case A_1_Send_case_3
+              by solve( !KU( ~x.2 ) @ #vk.17 )
+            next
+              case A_1_Send_case_4
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case A_1_Send_case_5
+              by solve( !KU( ~x.3 ) @ #vk.18 )
+            next
+              case B_2_Send_case_1
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case B_2_Send_case_2
+              solve( !KU( map(<~s, 'p'>)^x ) @ #vk.12 )
+                case A_1_Send_case_1
+                by solve( !KU( ~x ) @ #vk.14 )
+              next
+                case A_1_Send_case_2
+                by solve( !KU( ~x ) @ #vk.16 )
+              next
+                case A_1_Send_case_3
+                by solve( !KU( ~x.1 ) @ #vk.17 )
+              next
+                case A_1_Send_case_4
+                by solve( !KU( ~x.1 ) @ #vk.17 )
+              next
+                case A_1_Send_case_5
+                by solve( !KU( ~x.2 ) @ #vk.19 )
+              next
+                case B_2_Send_case_1
+                by solve( !KU( ~y.1 ) @ #vk.15 )
+              next
+                case B_2_Send_case_2
+                by solve( !KU( ~y.1 ) @ #vk.20 )
+              next
+                case B_2_Send_case_3
+                by solve( !KU( ~y.1 ) @ #vk.18 )
+              next
+                case B_2_Send_case_4
+                by solve( !KU( ~y.1 ) @ #vk.18 )
+              next
+                case B_2_Send_case_5
+                by solve( !KU( ~y.1 ) @ #vk.20 )
+              next
+                case c_exp
+                solve( !KU( map(<~s, 'p'>) ) @ #vk.15 )
+                  case A_1_Send
+                  by solve( !KU( ~x.1 ) @ #vk.17 )
+                next
+                  case B_2_Send
+                  by solve( !KU( ~y.1 ) @ #vk.18 )
+                next
+                  case c_map
+                  solve( !KU( ~s ) @ #vk.17 )
+                    case A_1_Send
+                    solve( !KU( ~sk ) @ #vk.19 )
+                      case Reveal_A
+                      by contradiction /* from formulas */
+                    next
+                      case Reveal_B
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              qed
+            next
+              case B_2_Send_case_3
+              by solve( !KU( ~y ) @ #vk.19 )
+            next
+              case B_2_Send_case_4
+              by solve( !KU( ~y.1 ) @ #vk.18 )
+            next
+              case B_2_Send_case_5
+              by solve( !KU( ~y ) @ #vk.16 )
+            next
+              case B_2_Send_case_6
+              by solve( !KU( ~y.1 ) @ #vk.19 )
+            next
+              case c_exp
+              by solve( !KU( ~y ) @ #vk.16 )
+            qed
+          qed
+        next
+          case split_case_4
+          solve( !KU( x^(x.1*inv(~y)) ) @ #vk.11 )
+            case A_1_Send_case_1
+            by solve( !KU( ~y ) @ #vk.14 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~y ) @ #vk.16 )
+          next
+            case A_1_Send_case_3
+            by solve( !KU( ~x.2 ) @ #vk.16 )
+          next
+            case A_1_Send_case_4
+            by solve( !KU( ~x.2 ) @ #vk.17 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y ) @ #vk.18 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y ) @ #vk.20 )
+          next
+            case B_2_Send_case_3
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case B_2_Send_case_4
+            by solve( !KU( ~y.1 ) @ #vk.18 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.17 )
+          qed
+        next
+          case split_case_5
+          solve( !KU( x^inv((~y*x.1)) ) @ #vk.11 )
+            case A_1_Send_case_1
+            by solve( !KU( ~x.2 ) @ #vk.15 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~x.2 ) @ #vk.16 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y.1 ) @ #vk.16 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.16 )
+          qed
+        next
+          case split_case_6
+          solve( !KU( x^(x.1*inv((~y*x.2))) ) @ #vk.11 )
+            case A_1_Send_case_1
+            by solve( !KU( ~y ) @ #vk.15 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~y ) @ #vk.17 )
+          next
+            case A_1_Send_case_3
+            by solve( !KU( ~x.3 ) @ #vk.16 )
+          next
+            case A_1_Send_case_4
+            by solve( !KU( ~x.3 ) @ #vk.17 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y ) @ #vk.19 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y ) @ #vk.21 )
+          next
+            case B_2_Send_case_3
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case B_2_Send_case_4
+            by solve( !KU( ~y.1 ) @ #vk.18 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.18 )
+          qed
+        qed
+      next
+        case A_3_Send
+        solve( !KU( ~sk^inv(~x) ) @ #vk.13 )
+          case c_exp
+          solve( !KU( ~sk ) @ #vk.14 )
+            case Reveal_A
+            by contradiction /* from formulas */
+          next
+            case Reveal_B
+            by contradiction /* from formulas */
+          qed
+        qed
+      next
+        case B_4_Send
+        solve( !KU( senc(<'A', 'B', map(<s, 'p'>)^~y>, h(~sk)) ) @ #vk.18 )
+          case c_senc
+          solve( !KU( h(~sk) ) @ #vk.22 )
+            case c_h
+            solve( !KU( ~sk ) @ #vk.23 )
+              case Reveal_A
+              by contradiction /* from formulas */
+            next
+              case Reveal_B
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      next
+        case c_senc
+        solve( !KU( h(~sk) ) @ #vk.14 )
+          case c_h
+          solve( !KU( ~sk ) @ #vk.15 )
+            case Reveal_A
+            by contradiction /* from formulas */
+          next
+            case Reveal_B
+            by contradiction /* from formulas */
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma noninjectiveagreementINITIATOR:
+  all-traces
+  "∀ a b t #i.
+    (Commit( a, b, <'I', 'R', t> ) @ #i) ⇒
+    ((∃ #j. Running( b, a, <'I', 'R', t> ) @ #j) ∨
+     (∃ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ a b t #i.
+  (Commit( a, b, <'I', 'R', t> ) @ #i)
+ ∧
+  (∀ #j. (Running( b, a, <'I', 'R', t> ) @ #j) ⇒ ⊥) ∧
+  (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
+*/
+simplify
+solve( Commit( a, b, <'I', 'R', t> ) @ #i )
+  case A_4_Recv
+  solve( St_A_4( $A, id, $B, sk_AB, x, s, 'p', gy, Kab ) ▶₁ #i )
+    case A_3_Send
+    solve( !KU( senc(<'B', 'A', map(<~s, 'p'>)^~x>, h(z)) ) @ #vk.6 )
+      case B_4_Send
+      solve( !KU( senc(<'A', 'B', map(<s.1, 'p'>)^~y>,
+                       h(map(<~s, 'p'>)^(~x*~y)))
+             ) @ #vk.13 )
+        case A_3_Send
+        solve( !KU( senc(~s, h(~sk.1)) ) @ #vk.14 )
+          case A_1_Send
+          by contradiction /* from formulas */
+        next
+          case c_senc
+          solve( !KU( ~s ) @ #vk.16 )
+            case A_1_Send
+            solve( !KU( ~sk ) @ #vk.19 )
+              case Reveal_A
+              by contradiction /* from formulas */
+            next
+              case Reveal_B
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      next
+        case c_senc
+        solve( !KU( h(map(<~s, 'p'>)^(~x*~y)) ) @ #vk.17 )
+          case c_h
+          solve( !KU( map(<~s, 'p'>)^(~x*~y) ) @ #vk.18 )
+            case A_1_Send_case_1
+            by solve( !KU( ~y ) @ #vk.19 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~x ) @ #vk.22 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~x ) @ #vk.18 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y.1 ) @ #vk.23 )
+          next
+            case c_exp
+            by solve( !KU( ~x ) @ #vk.21 )
+          qed
+        qed
+      qed
+    next
+      case c_senc
+      solve( splitEqs(1) )
+        case split_case_1
+        solve( !KU( h(gy^~x) ) @ #vk.8 )
+          case c_h
+          solve( !KU( gy^~x ) @ #vk.9 )
+            case A_1_Send_case_1
+            solve( !KU( map(<~s, 'p'>) ) @ #vk.8 )
+              case A_1_Send
+              by solve( !KU( ~x ) @ #vk.10 )
+            next
+              case B_2_Send
+              by solve( !KU( ~y ) @ #vk.10 )
+            next
+              case c_map
+              solve( !KU( ~s ) @ #vk.10 )
+                case A_1_Send
+                solve( !KU( ~sk ) @ #vk.13 )
+                  case Reveal_A
+                  by contradiction /* from formulas */
+                next
+                  case Reveal_B
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case B_2_Send
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case c_exp
+            by solve( !KU( ~x ) @ #vk.10 )
+          qed
+        qed
+      next
+        case split_case_2
+        solve( !KU( z^inv(~x) ) @ #vk.7 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x.1 ) @ #vk.11 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x.1 ) @ #vk.12 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~y ) @ #vk.11 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.11 )
+        qed
+      next
+        case split_case_3
+        solve( !KU( h(x.1^(~x*x.2)) ) @ #vk.8 )
+          case c_h
+          solve( !KU( x.1^(~x*x.2) ) @ #vk.9 )
+            case A_1_Send_case_1
+            by solve( !KU( ~x ) @ #vk.10 )
+          next
+            case A_1_Send_case_2
+            solve( !KU( map(<~s, 'p'>)^x.1 ) @ #vk.9 )
+              case A_1_Send_case_1
+              by solve( !KU( ~x ) @ #vk.9 )
+            next
+              case A_1_Send_case_2
+              by solve( !KU( ~x ) @ #vk.12 )
+            next
+              case A_1_Send_case_3
+              by solve( !KU( ~x ) @ #vk.13 )
+            next
+              case A_1_Send_case_4
+              by solve( !KU( ~x ) @ #vk.13 )
+            next
+              case A_1_Send_case_5
+              by solve( !KU( ~x ) @ #vk.15 )
+            next
+              case B_2_Send_case_1
+              by solve( !KU( ~y ) @ #vk.10 )
+            next
+              case B_2_Send_case_2
+              by solve( !KU( ~y ) @ #vk.17 )
+            next
+              case B_2_Send_case_3
+              by solve( !KU( ~y ) @ #vk.13 )
+            next
+              case B_2_Send_case_4
+              by solve( !KU( ~y ) @ #vk.13 )
+            next
+              case B_2_Send_case_5
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case c_exp
+              solve( !KU( map(<~s, 'p'>) ) @ #vk.11 )
+                case A_1_Send
+                by solve( !KU( ~x ) @ #vk.13 )
+              next
+                case B_2_Send
+                by solve( !KU( ~y ) @ #vk.13 )
+              next
+                case c_map
+                solve( !KU( ~s ) @ #vk.13 )
+                  case A_1_Send
+                  solve( !KU( ~sk ) @ #vk.16 )
+                    case Reveal_A
+                    by contradiction /* from formulas */
+                  next
+                    case Reveal_B
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          next
+            case A_1_Send_case_3
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case A_1_Send_case_4
+            by solve( !KU( ~x.2 ) @ #vk.13 )
+          next
+            case A_1_Send_case_5
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case A_1_Send_case_6
+            by solve( !KU( ~x.3 ) @ #vk.14 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~x ) @ #vk.10 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~x ) @ #vk.16 )
+          next
+            case B_2_Send_case_3
+            by solve( !KU( ~y ) @ #vk.13 )
+          next
+            case B_2_Send_case_4
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case B_2_Send_case_5
+            by solve( !KU( ~y ) @ #vk.14 )
+          next
+            case c_exp
+            by solve( !KU( ~x ) @ #vk.12 )
+          qed
+        qed
+      next
+        case split_case_4
+        solve( !KU( x.1^(x.2*inv(~x)) ) @ #vk.7 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x ) @ #vk.10 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x ) @ #vk.12 )
+        next
+          case A_1_Send_case_3
+          by solve( !KU( ~x.2 ) @ #vk.12 )
+        next
+          case A_1_Send_case_4
+          by solve( !KU( ~x.2 ) @ #vk.13 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~x ) @ #vk.15 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~x ) @ #vk.17 )
+        next
+          case B_2_Send_case_3
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case B_2_Send_case_4
+          by solve( !KU( ~y ) @ #vk.13 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.13 )
+        qed
+      next
+        case split_case_5
+        solve( !KU( x.1^inv((~x*x.2)) ) @ #vk.7 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x.2 ) @ #vk.11 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x.2 ) @ #vk.12 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~y ) @ #vk.11 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.12 )
+        qed
+      next
+        case split_case_6
+        solve( !KU( x.1^(x.2*inv((~x*x.3))) ) @ #vk.7 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x ) @ #vk.11 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x ) @ #vk.13 )
+        next
+          case A_1_Send_case_3
+          by solve( !KU( ~x.3 ) @ #vk.12 )
+        next
+          case A_1_Send_case_4
+          by solve( !KU( ~x.3 ) @ #vk.13 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~x ) @ #vk.16 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~x ) @ #vk.18 )
+        next
+          case B_2_Send_case_3
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case B_2_Send_case_4
+          by solve( !KU( ~y ) @ #vk.13 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.14 )
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma injectiveagreementINITIATOR:
+  all-traces
+  "∀ a b t #i.
+    (Commit( a, b, <'I', 'R', t> ) @ #i) ⇒
+    ((∃ #j.
+       (Running( b, a, <'I', 'R', t> ) @ #j) ∧
+       (¬(∃ a2 b2 #i2.
+           (Commit( a2, b2, <'I', 'R', t> ) @ #i2) ∧ (¬(#i2 = #i))))) ∨
+     (∃ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ a b t #i.
+  (Commit( a, b, <'I', 'R', t> ) @ #i)
+ ∧
+  (∀ #j.
+    (Running( b, a, <'I', 'R', t> ) @ #j)
+   ⇒
+    ∃ a2 b2 #i2.
+     (Commit( a2, b2, <'I', 'R', t> ) @ #i2) ∧ ¬(#i2 = #i)) ∧
+  (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
+*/
+simplify
+solve( Commit( a, b, <'I', 'R', t> ) @ #i )
+  case A_4_Recv
+  solve( St_A_4( $A, id, $B, sk_AB, x, s, 'p', gy, Kab ) ▶₁ #i )
+    case A_3_Send
+    solve( !KU( senc(<'B', 'A', map(<~s, 'p'>)^~x>, h(z)) ) @ #vk.6 )
+      case B_4_Send
+      solve( !KU( senc(<'A', 'B', map(<s.1, 'p'>)^~y>,
+                       h(map(<~s, 'p'>)^(~x*~y)))
+             ) @ #vk.13 )
+        case A_3_Send
+        solve( !KU( senc(~s, h(~sk.1)) ) @ #vk.14 )
+          case A_1_Send
+          solve( (#i2 < #i)  ∥ (#i < #i2) )
+            case case_1
+            solve( Commit( a2, b2,
+                           <'I', 'R', map(<~s, 'p'>)^~x, map(<~s, 'p'>)^~y, 
+                            h(map(<~s, 'p'>)^(~x*~y))>
+                   ) @ #i2 )
+              case A_4_Recv
+              solve( St_A_4( $A.1, id.1, $B.1, sk_AB, ~x, ~s, 'p',
+                             map(<~s, 'p'>)^~y, h(map(<~s, 'p'>)^(~x*~y))
+                     ) ▶₁ #i2 )
+                case A_3_Send
+                by contradiction /* cyclic */
+              qed
+            qed
+          next
+            case case_2
+            solve( Commit( a2, b2,
+                           <'I', 'R', map(<~s, 'p'>)^~x, map(<~s, 'p'>)^~y, 
+                            h(map(<~s, 'p'>)^(~x*~y))>
+                   ) @ #i2 )
+              case A_4_Recv
+              solve( St_A_4( $A.1, id.1, $B.1, sk_AB, ~x, ~s, 'p',
+                             map(<~s, 'p'>)^~y, h(map(<~s, 'p'>)^(~x*~y))
+                     ) ▶₁ #i2 )
+                case A_3_Send
+                by contradiction /* cyclic */
+              qed
+            qed
+          qed
+        next
+          case c_senc
+          solve( !KU( ~s ) @ #vk.16 )
+            case A_1_Send
+            solve( !KU( ~sk ) @ #vk.19 )
+              case Reveal_A
+              by contradiction /* from formulas */
+            next
+              case Reveal_B
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      next
+        case c_senc
+        solve( !KU( h(map(<~s, 'p'>)^(~x*~y)) ) @ #vk.17 )
+          case c_h
+          solve( !KU( map(<~s, 'p'>)^(~x*~y) ) @ #vk.18 )
+            case A_1_Send_case_1
+            by solve( !KU( ~y ) @ #vk.19 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~x ) @ #vk.22 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~x ) @ #vk.18 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y.1 ) @ #vk.23 )
+          next
+            case c_exp
+            by solve( !KU( ~x ) @ #vk.21 )
+          qed
+        qed
+      qed
+    next
+      case c_senc
+      solve( splitEqs(1) )
+        case split_case_1
+        solve( !KU( h(gy^~x) ) @ #vk.8 )
+          case c_h
+          solve( !KU( gy^~x ) @ #vk.9 )
+            case A_1_Send_case_1
+            solve( !KU( map(<~s, 'p'>) ) @ #vk.8 )
+              case A_1_Send
+              by solve( !KU( ~x ) @ #vk.10 )
+            next
+              case B_2_Send
+              by solve( !KU( ~y ) @ #vk.10 )
+            next
+              case c_map
+              solve( !KU( ~s ) @ #vk.10 )
+                case A_1_Send
+                solve( !KU( ~sk ) @ #vk.13 )
+                  case Reveal_A
+                  by contradiction /* from formulas */
+                next
+                  case Reveal_B
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case B_2_Send
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case c_exp
+            by solve( !KU( ~x ) @ #vk.10 )
+          qed
+        qed
+      next
+        case split_case_2
+        solve( !KU( z^inv(~x) ) @ #vk.7 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x.1 ) @ #vk.11 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x.1 ) @ #vk.12 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~y ) @ #vk.11 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.11 )
+        qed
+      next
+        case split_case_3
+        solve( !KU( h(x.1^(~x*x.2)) ) @ #vk.8 )
+          case c_h
+          solve( !KU( x.1^(~x*x.2) ) @ #vk.9 )
+            case A_1_Send_case_1
+            by solve( !KU( ~x ) @ #vk.10 )
+          next
+            case A_1_Send_case_2
+            solve( !KU( map(<~s, 'p'>)^x.1 ) @ #vk.9 )
+              case A_1_Send_case_1
+              by solve( !KU( ~x ) @ #vk.9 )
+            next
+              case A_1_Send_case_2
+              by solve( !KU( ~x ) @ #vk.12 )
+            next
+              case A_1_Send_case_3
+              by solve( !KU( ~x ) @ #vk.13 )
+            next
+              case A_1_Send_case_4
+              by solve( !KU( ~x ) @ #vk.13 )
+            next
+              case A_1_Send_case_5
+              by solve( !KU( ~x ) @ #vk.15 )
+            next
+              case B_2_Send_case_1
+              by solve( !KU( ~y ) @ #vk.10 )
+            next
+              case B_2_Send_case_2
+              by solve( !KU( ~y ) @ #vk.17 )
+            next
+              case B_2_Send_case_3
+              by solve( !KU( ~y ) @ #vk.13 )
+            next
+              case B_2_Send_case_4
+              by solve( !KU( ~y ) @ #vk.13 )
+            next
+              case B_2_Send_case_5
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case c_exp
+              solve( !KU( map(<~s, 'p'>) ) @ #vk.11 )
+                case A_1_Send
+                by solve( !KU( ~x ) @ #vk.13 )
+              next
+                case B_2_Send
+                by solve( !KU( ~y ) @ #vk.13 )
+              next
+                case c_map
+                solve( !KU( ~s ) @ #vk.13 )
+                  case A_1_Send
+                  solve( !KU( ~sk ) @ #vk.16 )
+                    case Reveal_A
+                    by contradiction /* from formulas */
+                  next
+                    case Reveal_B
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          next
+            case A_1_Send_case_3
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case A_1_Send_case_4
+            by solve( !KU( ~x.2 ) @ #vk.13 )
+          next
+            case A_1_Send_case_5
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case A_1_Send_case_6
+            by solve( !KU( ~x.3 ) @ #vk.14 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~x ) @ #vk.10 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~x ) @ #vk.16 )
+          next
+            case B_2_Send_case_3
+            by solve( !KU( ~y ) @ #vk.13 )
+          next
+            case B_2_Send_case_4
+            by solve( !KU( ~x ) @ #vk.11 )
+          next
+            case B_2_Send_case_5
+            by solve( !KU( ~y ) @ #vk.14 )
+          next
+            case c_exp
+            by solve( !KU( ~x ) @ #vk.12 )
+          qed
+        qed
+      next
+        case split_case_4
+        solve( !KU( x.1^(x.2*inv(~x)) ) @ #vk.7 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x ) @ #vk.10 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x ) @ #vk.12 )
+        next
+          case A_1_Send_case_3
+          by solve( !KU( ~x.2 ) @ #vk.12 )
+        next
+          case A_1_Send_case_4
+          by solve( !KU( ~x.2 ) @ #vk.13 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~x ) @ #vk.15 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~x ) @ #vk.17 )
+        next
+          case B_2_Send_case_3
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case B_2_Send_case_4
+          by solve( !KU( ~y ) @ #vk.13 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.13 )
+        qed
+      next
+        case split_case_5
+        solve( !KU( x.1^inv((~x*x.2)) ) @ #vk.7 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x.2 ) @ #vk.11 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x.2 ) @ #vk.12 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~y ) @ #vk.11 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.12 )
+        qed
+      next
+        case split_case_6
+        solve( !KU( x.1^(x.2*inv((~x*x.3))) ) @ #vk.7 )
+          case A_1_Send_case_1
+          by solve( !KU( ~x ) @ #vk.11 )
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x ) @ #vk.13 )
+        next
+          case A_1_Send_case_3
+          by solve( !KU( ~x.3 ) @ #vk.12 )
+        next
+          case A_1_Send_case_4
+          by solve( !KU( ~x.3 ) @ #vk.13 )
+        next
+          case B_2_Send_case_1
+          by solve( !KU( ~x ) @ #vk.16 )
+        next
+          case B_2_Send_case_2
+          by solve( !KU( ~x ) @ #vk.18 )
+        next
+          case B_2_Send_case_3
+          by solve( !KU( ~y ) @ #vk.12 )
+        next
+          case B_2_Send_case_4
+          by solve( !KU( ~y ) @ #vk.13 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.14 )
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma noninjectiveagreementRESPONDER:
+  all-traces
+  "∀ a b t #i.
+    (Commit( a, b, <'R', 'I', t> ) @ #i) ⇒
+    ((∃ #j. Running( b, a, <'R', 'I', t> ) @ #j) ∨
+     (∃ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ a b t #i.
+  (Commit( a, b, <'R', 'I', t> ) @ #i)
+ ∧
+  (∀ #j. (Running( b, a, <'R', 'I', t> ) @ #j) ⇒ ⊥) ∧
+  (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
+*/
+simplify
+solve( Commit( a, b, <'R', 'I', t> ) @ #i )
+  case B_3_Recv
+  solve( St_B_3( $B, id, $A, sk_AB, gx, s, 'p', y ) ▶₁ #i )
+    case B_2_Send
+    solve( !KU( senc(<'A', 'B', map(<s, 'p'>)^~y>, h(z)) ) @ #vk.6 )
+      case A_3_Send
+      solve( !KU( senc(s, h(~sk)) ) @ #vk.10 )
+        case A_1_Send
+        solve( !KU( map(<~s, 'p'>)^~x ) @ #vk.9 )
+          case A_1_Send_case_1
+          by contradiction /* from formulas */
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x ) @ #vk.13 )
+        next
+          case B_2_Send
+          by solve( !KU( ~x ) @ #vk.14 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.13 )
+        qed
+      next
+        case A_3_Send
+        solve( !KU( map(<<'A', 'B', ~sk^inv(~x)>, 'p'>)^~x.1 ) @ #vk.9 )
+          case B_2_Send
+          by solve( !KU( ~x.1 ) @ #vk.15 )
+        next
+          case c_exp
+          by solve( !KU( ~x.1 ) @ #vk.14 )
+        qed
+      next
+        case B_4_Send
+        solve( !KU( map(<<'B', 'A', ~sk^inv(~y)>, 'p'>)^~x ) @ #vk.11 )
+          case B_2_Send
+          by solve( !KU( ~x ) @ #vk.23 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.22 )
+        qed
+      next
+        case c_senc
+        solve( !KU( h(~sk) ) @ #vk.13 )
+          case c_h
+          solve( !KU( ~sk ) @ #vk.14 )
+            case Reveal_A
+            by contradiction /* from formulas */
+          next
+            case Reveal_B
+            by contradiction /* from formulas */
+          qed
+        qed
+      qed
+    next
+      case c_senc
+      solve( !KU( senc(s, h(~sk)) ) @ #vk.10 )
+        case A_1_Send
+        solve( splitEqs(0) )
+          case split_case_1
+          solve( !KU( h(gx^~y) ) @ #vk.12 )
+            case c_h
+            solve( !KU( gx^~y ) @ #vk.13 )
+              case A_1_Send
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case B_2_Send_case_1
+              solve( !KU( map(<~s, 'p'>) ) @ #vk.11 )
+                case A_1_Send
+                by solve( !KU( ~x ) @ #vk.14 )
+              next
+                case B_2_Send
+                by solve( !KU( ~y.1 ) @ #vk.15 )
+              next
+                case c_map
+                solve( !KU( ~s ) @ #vk.14 )
+                  case A_1_Send
+                  solve( !KU( ~sk ) @ #vk.16 )
+                    case Reveal_A
+                    by contradiction /* from formulas */
+                  next
+                    case Reveal_B
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            next
+              case B_2_Send_case_2
+              by solve( !KU( ~y ) @ #vk.16 )
+            next
+              case c_exp
+              by solve( !KU( ~y ) @ #vk.14 )
+            qed
+          qed
+        next
+          case split_case_2
+          solve( !KU( z^inv(~y) ) @ #vk.10 )
+            case A_1_Send_case_1
+            by solve( !KU( ~x.1 ) @ #vk.15 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~x.1 ) @ #vk.16 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y.1 ) @ #vk.16 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.15 )
+          qed
+        next
+          case split_case_3
+          solve( !KU( h(x^(~y*x.1)) ) @ #vk.12 )
+            case c_h
+            solve( !KU( x^(~y*x.1) ) @ #vk.13 )
+              case A_1_Send_case_1
+              by solve( !KU( ~y ) @ #vk.14 )
+            next
+              case A_1_Send_case_2
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case A_1_Send_case_3
+              by solve( !KU( ~x.2 ) @ #vk.17 )
+            next
+              case A_1_Send_case_4
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case A_1_Send_case_5
+              by solve( !KU( ~x.3 ) @ #vk.18 )
+            next
+              case B_2_Send_case_1
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case B_2_Send_case_2
+              solve( !KU( map(<~s, 'p'>)^x ) @ #vk.12 )
+                case A_1_Send_case_1
+                by solve( !KU( ~x ) @ #vk.14 )
+              next
+                case A_1_Send_case_2
+                by solve( !KU( ~x ) @ #vk.16 )
+              next
+                case A_1_Send_case_3
+                by solve( !KU( ~x.1 ) @ #vk.17 )
+              next
+                case A_1_Send_case_4
+                by solve( !KU( ~x.1 ) @ #vk.17 )
+              next
+                case A_1_Send_case_5
+                by solve( !KU( ~x.2 ) @ #vk.19 )
+              next
+                case B_2_Send_case_1
+                by solve( !KU( ~y.1 ) @ #vk.15 )
+              next
+                case B_2_Send_case_2
+                by solve( !KU( ~y.1 ) @ #vk.20 )
+              next
+                case B_2_Send_case_3
+                by solve( !KU( ~y.1 ) @ #vk.18 )
+              next
+                case B_2_Send_case_4
+                by solve( !KU( ~y.1 ) @ #vk.18 )
+              next
+                case B_2_Send_case_5
+                by solve( !KU( ~y.1 ) @ #vk.20 )
+              next
+                case c_exp
+                solve( !KU( map(<~s, 'p'>) ) @ #vk.15 )
+                  case A_1_Send
+                  by solve( !KU( ~x.1 ) @ #vk.17 )
+                next
+                  case B_2_Send
+                  by solve( !KU( ~y.1 ) @ #vk.18 )
+                next
+                  case c_map
+                  solve( !KU( ~s ) @ #vk.17 )
+                    case A_1_Send
+                    solve( !KU( ~sk ) @ #vk.19 )
+                      case Reveal_A
+                      by contradiction /* from formulas */
+                    next
+                      case Reveal_B
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              qed
+            next
+              case B_2_Send_case_3
+              by solve( !KU( ~y ) @ #vk.19 )
+            next
+              case B_2_Send_case_4
+              by solve( !KU( ~y.1 ) @ #vk.18 )
+            next
+              case B_2_Send_case_5
+              by solve( !KU( ~y ) @ #vk.16 )
+            next
+              case B_2_Send_case_6
+              by solve( !KU( ~y.1 ) @ #vk.19 )
+            next
+              case c_exp
+              by solve( !KU( ~y ) @ #vk.16 )
+            qed
+          qed
+        next
+          case split_case_4
+          solve( !KU( x^(x.1*inv(~y)) ) @ #vk.10 )
+            case A_1_Send_case_1
+            by solve( !KU( ~y ) @ #vk.14 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~y ) @ #vk.16 )
+          next
+            case A_1_Send_case_3
+            by solve( !KU( ~x.2 ) @ #vk.16 )
+          next
+            case A_1_Send_case_4
+            by solve( !KU( ~x.2 ) @ #vk.17 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y ) @ #vk.18 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y ) @ #vk.20 )
+          next
+            case B_2_Send_case_3
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case B_2_Send_case_4
+            by solve( !KU( ~y.1 ) @ #vk.18 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.17 )
+          qed
+        next
+          case split_case_5
+          solve( !KU( x^inv((~y*x.1)) ) @ #vk.10 )
+            case A_1_Send_case_1
+            by solve( !KU( ~x.2 ) @ #vk.15 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~x.2 ) @ #vk.16 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y.1 ) @ #vk.16 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.16 )
+          qed
+        next
+          case split_case_6
+          solve( !KU( x^(x.1*inv((~y*x.2))) ) @ #vk.10 )
+            case A_1_Send_case_1
+            by solve( !KU( ~y ) @ #vk.15 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~y ) @ #vk.17 )
+          next
+            case A_1_Send_case_3
+            by solve( !KU( ~x.3 ) @ #vk.16 )
+          next
+            case A_1_Send_case_4
+            by solve( !KU( ~x.3 ) @ #vk.17 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y ) @ #vk.19 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y ) @ #vk.21 )
+          next
+            case B_2_Send_case_3
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case B_2_Send_case_4
+            by solve( !KU( ~y.1 ) @ #vk.18 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.18 )
+          qed
+        qed
+      next
+        case A_3_Send
+        solve( !KU( ~sk^inv(~x) ) @ #vk.13 )
+          case c_exp
+          solve( !KU( ~sk ) @ #vk.14 )
+            case Reveal_A
+            by contradiction /* from formulas */
+          next
+            case Reveal_B
+            by contradiction /* from formulas */
+          qed
+        qed
+      next
+        case B_4_Send
+        solve( !KU( senc(<'A', 'B', map(<s, 'p'>)^~y>, h(~sk)) ) @ #vk.18 )
+          case c_senc
+          solve( !KU( h(~sk) ) @ #vk.22 )
+            case c_h
+            solve( !KU( ~sk ) @ #vk.23 )
+              case Reveal_A
+              by contradiction /* from formulas */
+            next
+              case Reveal_B
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      next
+        case c_senc
+        solve( !KU( h(~sk) ) @ #vk.14 )
+          case c_h
+          solve( !KU( ~sk ) @ #vk.15 )
+            case Reveal_A
+            by contradiction /* from formulas */
+          next
+            case Reveal_B
+            by contradiction /* from formulas */
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma injectiveagreementRESPONDER:
+  all-traces
+  "∀ a b t #i.
+    (Commit( a, b, <'R', 'I', t> ) @ #i) ⇒
+    ((∃ #j.
+       (Running( b, a, <'R', 'I', t> ) @ #j) ∧
+       (¬(∃ a2 b2 #i2.
+           (Commit( a2, b2, <'R', 'I', t> ) @ #i2) ∧ (¬(#i2 = #i))))) ∨
+     (∃ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ a b t #i.
+  (Commit( a, b, <'R', 'I', t> ) @ #i)
+ ∧
+  (∀ #j.
+    (Running( b, a, <'R', 'I', t> ) @ #j)
+   ⇒
+    ∃ a2 b2 #i2.
+     (Commit( a2, b2, <'R', 'I', t> ) @ #i2) ∧ ¬(#i2 = #i)) ∧
+  (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
+*/
+simplify
+solve( Commit( a, b, <'R', 'I', t> ) @ #i )
+  case B_3_Recv
+  solve( St_B_3( $B, id, $A, sk_AB, gx, s, 'p', y ) ▶₁ #i )
+    case B_2_Send
+    solve( !KU( senc(<'A', 'B', map(<s, 'p'>)^~y>, h(z)) ) @ #vk.6 )
+      case A_3_Send
+      solve( !KU( senc(s, h(~sk)) ) @ #vk.10 )
+        case A_1_Send
+        solve( !KU( map(<~s, 'p'>)^~x ) @ #vk.9 )
+          case A_1_Send_case_1
+          solve( (#i2 < #i)  ∥ (#i < #i2) )
+            case case_1
+            solve( Commit( a2, b2,
+                           <'R', 'I', map(<~s, 'p'>)^~x, map(<~s, 'p'>)^~y, 
+                            h(map(<~s, 'p'>)^(~x*~y))>
+                   ) @ #i2 )
+              case B_3_Recv
+              solve( St_B_3( $B.1, id.1, $A.1, sk_AB, map(<~s, 'p'>)^~x, ~s, 'p',
+                             ~y
+                     ) ▶₁ #i2 )
+                case B_2_Send
+                by contradiction /* cyclic */
+              qed
+            qed
+          next
+            case case_2
+            solve( Commit( a2, b2,
+                           <'R', 'I', map(<~s, 'p'>)^~x, map(<~s, 'p'>)^~y, 
+                            h(map(<~s, 'p'>)^(~x*~y))>
+                   ) @ #i2 )
+              case B_3_Recv
+              solve( St_B_3( $B.1, id.1, $A.1, sk_AB, map(<~s, 'p'>)^~x, ~s, 'p',
+                             ~y
+                     ) ▶₁ #i2 )
+                case B_2_Send
+                by contradiction /* cyclic */
+              qed
+            qed
+          qed
+        next
+          case A_1_Send_case_2
+          by solve( !KU( ~x ) @ #vk.13 )
+        next
+          case B_2_Send
+          by solve( !KU( ~x ) @ #vk.14 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.13 )
+        qed
+      next
+        case A_3_Send
+        solve( !KU( map(<<'A', 'B', ~sk^inv(~x)>, 'p'>)^~x.1 ) @ #vk.9 )
+          case B_2_Send
+          by solve( !KU( ~x.1 ) @ #vk.15 )
+        next
+          case c_exp
+          by solve( !KU( ~x.1 ) @ #vk.14 )
+        qed
+      next
+        case B_4_Send
+        solve( !KU( map(<<'B', 'A', ~sk^inv(~y)>, 'p'>)^~x ) @ #vk.11 )
+          case B_2_Send
+          by solve( !KU( ~x ) @ #vk.23 )
+        next
+          case c_exp
+          by solve( !KU( ~x ) @ #vk.22 )
+        qed
+      next
+        case c_senc
+        solve( !KU( h(~sk) ) @ #vk.13 )
+          case c_h
+          solve( !KU( ~sk ) @ #vk.14 )
+            case Reveal_A
+            by contradiction /* from formulas */
+          next
+            case Reveal_B
+            by contradiction /* from formulas */
+          qed
+        qed
+      qed
+    next
+      case c_senc
+      solve( !KU( senc(s, h(~sk)) ) @ #vk.10 )
+        case A_1_Send
+        solve( splitEqs(0) )
+          case split_case_1
+          solve( !KU( h(gx^~y) ) @ #vk.12 )
+            case c_h
+            solve( !KU( gx^~y ) @ #vk.13 )
+              case A_1_Send
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case B_2_Send_case_1
+              solve( !KU( map(<~s, 'p'>) ) @ #vk.11 )
+                case A_1_Send
+                by solve( !KU( ~x ) @ #vk.14 )
+              next
+                case B_2_Send
+                by solve( !KU( ~y.1 ) @ #vk.15 )
+              next
+                case c_map
+                solve( !KU( ~s ) @ #vk.14 )
+                  case A_1_Send
+                  solve( !KU( ~sk ) @ #vk.16 )
+                    case Reveal_A
+                    by contradiction /* from formulas */
+                  next
+                    case Reveal_B
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            next
+              case B_2_Send_case_2
+              by solve( !KU( ~y ) @ #vk.16 )
+            next
+              case c_exp
+              by solve( !KU( ~y ) @ #vk.14 )
+            qed
+          qed
+        next
+          case split_case_2
+          solve( !KU( z^inv(~y) ) @ #vk.10 )
+            case A_1_Send_case_1
+            by solve( !KU( ~x.1 ) @ #vk.15 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~x.1 ) @ #vk.16 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y.1 ) @ #vk.16 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.15 )
+          qed
+        next
+          case split_case_3
+          solve( !KU( h(x^(~y*x.1)) ) @ #vk.12 )
+            case c_h
+            solve( !KU( x^(~y*x.1) ) @ #vk.13 )
+              case A_1_Send_case_1
+              by solve( !KU( ~y ) @ #vk.14 )
+            next
+              case A_1_Send_case_2
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case A_1_Send_case_3
+              by solve( !KU( ~x.2 ) @ #vk.17 )
+            next
+              case A_1_Send_case_4
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case A_1_Send_case_5
+              by solve( !KU( ~x.3 ) @ #vk.18 )
+            next
+              case B_2_Send_case_1
+              by solve( !KU( ~y ) @ #vk.15 )
+            next
+              case B_2_Send_case_2
+              solve( !KU( map(<~s, 'p'>)^x ) @ #vk.12 )
+                case A_1_Send_case_1
+                by solve( !KU( ~x ) @ #vk.14 )
+              next
+                case A_1_Send_case_2
+                by solve( !KU( ~x ) @ #vk.16 )
+              next
+                case A_1_Send_case_3
+                by solve( !KU( ~x.1 ) @ #vk.17 )
+              next
+                case A_1_Send_case_4
+                by solve( !KU( ~x.1 ) @ #vk.17 )
+              next
+                case A_1_Send_case_5
+                by solve( !KU( ~x.2 ) @ #vk.19 )
+              next
+                case B_2_Send_case_1
+                by solve( !KU( ~y.1 ) @ #vk.15 )
+              next
+                case B_2_Send_case_2
+                by solve( !KU( ~y.1 ) @ #vk.20 )
+              next
+                case B_2_Send_case_3
+                by solve( !KU( ~y.1 ) @ #vk.18 )
+              next
+                case B_2_Send_case_4
+                by solve( !KU( ~y.1 ) @ #vk.18 )
+              next
+                case B_2_Send_case_5
+                by solve( !KU( ~y.1 ) @ #vk.20 )
+              next
+                case c_exp
+                solve( !KU( map(<~s, 'p'>) ) @ #vk.15 )
+                  case A_1_Send
+                  by solve( !KU( ~x.1 ) @ #vk.17 )
+                next
+                  case B_2_Send
+                  by solve( !KU( ~y.1 ) @ #vk.18 )
+                next
+                  case c_map
+                  solve( !KU( ~s ) @ #vk.17 )
+                    case A_1_Send
+                    solve( !KU( ~sk ) @ #vk.19 )
+                      case Reveal_A
+                      by contradiction /* from formulas */
+                    next
+                      case Reveal_B
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              qed
+            next
+              case B_2_Send_case_3
+              by solve( !KU( ~y ) @ #vk.19 )
+            next
+              case B_2_Send_case_4
+              by solve( !KU( ~y.1 ) @ #vk.18 )
+            next
+              case B_2_Send_case_5
+              by solve( !KU( ~y ) @ #vk.16 )
+            next
+              case B_2_Send_case_6
+              by solve( !KU( ~y.1 ) @ #vk.19 )
+            next
+              case c_exp
+              by solve( !KU( ~y ) @ #vk.16 )
+            qed
+          qed
+        next
+          case split_case_4
+          solve( !KU( x^(x.1*inv(~y)) ) @ #vk.10 )
+            case A_1_Send_case_1
+            by solve( !KU( ~y ) @ #vk.14 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~y ) @ #vk.16 )
+          next
+            case A_1_Send_case_3
+            by solve( !KU( ~x.2 ) @ #vk.16 )
+          next
+            case A_1_Send_case_4
+            by solve( !KU( ~x.2 ) @ #vk.17 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y ) @ #vk.18 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y ) @ #vk.20 )
+          next
+            case B_2_Send_case_3
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case B_2_Send_case_4
+            by solve( !KU( ~y.1 ) @ #vk.18 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.17 )
+          qed
+        next
+          case split_case_5
+          solve( !KU( x^inv((~y*x.1)) ) @ #vk.10 )
+            case A_1_Send_case_1
+            by solve( !KU( ~x.2 ) @ #vk.15 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~x.2 ) @ #vk.16 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y.1 ) @ #vk.16 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.16 )
+          qed
+        next
+          case split_case_6
+          solve( !KU( x^(x.1*inv((~y*x.2))) ) @ #vk.10 )
+            case A_1_Send_case_1
+            by solve( !KU( ~y ) @ #vk.15 )
+          next
+            case A_1_Send_case_2
+            by solve( !KU( ~y ) @ #vk.17 )
+          next
+            case A_1_Send_case_3
+            by solve( !KU( ~x.3 ) @ #vk.16 )
+          next
+            case A_1_Send_case_4
+            by solve( !KU( ~x.3 ) @ #vk.17 )
+          next
+            case B_2_Send_case_1
+            by solve( !KU( ~y ) @ #vk.19 )
+          next
+            case B_2_Send_case_2
+            by solve( !KU( ~y ) @ #vk.21 )
+          next
+            case B_2_Send_case_3
+            by solve( !KU( ~y.1 ) @ #vk.17 )
+          next
+            case B_2_Send_case_4
+            by solve( !KU( ~y.1 ) @ #vk.18 )
+          next
+            case c_exp
+            by solve( !KU( ~y ) @ #vk.18 )
+          qed
+        qed
+      next
+        case A_3_Send
+        solve( !KU( ~sk^inv(~x) ) @ #vk.13 )
+          case c_exp
+          solve( !KU( ~sk ) @ #vk.14 )
+            case Reveal_A
+            by contradiction /* from formulas */
+          next
+            case Reveal_B
+            by contradiction /* from formulas */
+          qed
+        qed
+      next
+        case B_4_Send
+        solve( !KU( senc(<'A', 'B', map(<s, 'p'>)^~y>, h(~sk)) ) @ #vk.18 )
+          case c_senc
+          solve( !KU( h(~sk) ) @ #vk.22 )
+            case c_h
+            solve( !KU( ~sk ) @ #vk.23 )
+              case Reveal_A
+              by contradiction /* from formulas */
+            next
+              case Reveal_B
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      next
+        case c_senc
+        solve( !KU( h(~sk) ) @ #vk.14 )
+          case c_h
+          solve( !KU( ~sk ) @ #vk.15 )
+            case Reveal_A
+            by contradiction /* from formulas */
+          next
+            case Reveal_B
+            by contradiction /* from formulas */
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+/* All well-formedness checks were successful. */
+
+end
