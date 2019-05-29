@@ -1,0 +1,946 @@
+theory OTR4 begin
+
+// Function signature and definition of the equational theory E
+
+builtins: diffie-hellman
+functions: fst/1, h/1, mac/2, pair/2, pk/1, sdec/2, senc/2, sign/2,
+           snd/1, true/0, verify/3
+equations:
+    fst(<x.1, x.2>) = x.1,
+    mac(m, k) = <m, senc(m, k)>,
+    sdec(senc(x.1, x.2), x.2) = x.1,
+    snd(<x.1, x.2>) = x.2,
+    verify(sign(x.1, x.2), x.1, pk(x.2)) = true
+
+
+
+rule (modulo E) Register_pk:
+   [ Fr( ~skA ) ]
+  --[ Register( $A ) ]->
+   [ !Ltk( $A, ~skA ), !Pk( $A, pk(~skA) ), Out( pk(~skA) ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Reveal_ltk:
+   [ !Ltk( A, skA ) ] --[ Reveal( A ) ]-> [ Out( skA ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Init_Initiator:
+   [ Fr( ~id ), !Ltk( $A, skA ), !Pk( $B, pkB ) ]
+  --[ Create_I( $A, ~id, 'initiator' ) ]->
+   [ St_A_1( $A, ~id, $B, skA, pkB ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Init_Responder:
+   [ Fr( ~id ), !Ltk( $B, skB ), !Pk( $A, pkA ) ]
+  --[ Create_R( $B, ~id, 'responder' ) ]->
+   [ St_B_1( $B, ~id, $A, skB, pkA ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A_1_Send:
+   [ St_A_1( $A, ~id, $B, skA, pkB ), Fr( ~x ) ]
+  --[ Send( $A, 'g'^~x ), Unique( ~id, skA ) ]->
+   [ St_A_2( $A, ~id, $B, skA, pkB, ~x ), Out( 'g'^~x ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) B_1_receive:
+   [ St_B_1( $B, ~id, $A, skB, pkA ), In( X ) ]
+  --[ Receive( $B, X ), Unique( ~id, skB ) ]->
+   [ St_B_2( $B, ~id, $A, skB, pkA, X ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) B_2_Send:
+   [ St_B_2( $B, ~id, $A, skB, pkA, X ), Fr( ~y ) ]
+  --[ Send( $B, 'g'^~y ), Unique( ~id, skB ) ]->
+   [ St_B_3( $B, ~id, $A, skB, pkA, X, ~y ), Out( 'g'^~y ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A_2_receive:
+   [ St_A_2( $A, ~id, $B, skA, pkB, ~x ), In( Y ) ]
+  --[ Receive( $A, Y ), Unique( ~id, skA ) ]->
+   [ St_A_3( $A, ~id, $B, skA, pkB, ~x, Y ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A_3_Send:
+   [ St_A_3( $A, ~id, $B, skA, pkB, ~x, Y ) ]
+  --[
+  Send( $A,
+        <'A', sign(<'g'^~x, Y>, skA), mac(<'0', 'A'>, h(Y^~x)), pk(skA)>
+  ),
+  Unique( ~id, skA ), Running( $A, $B, <'R', 'I', Y^~x> )
+  ]->
+   [
+   St_A_4( $A, ~id, $B, skA, pkB, ~x, Y, h(Y^~x) ),
+   Out( <'A', sign(<'g'^~x, Y>, skA), mac(<'0', 'A'>, h(Y^~x)), 
+         pk(skA)>
+   )
+   ]
+
+  /*
+  rule (modulo AC) A_3_Send:
+     [ St_A_3( $A, ~id, $B, skA, pkB, ~x, Y ) ]
+    --[
+    Send( $A,
+          <'A', sign(<'g'^~x, Y>, skA), 
+           <<'0', 'A'>, senc(<'0', 'A'>, h(z))>, pk(skA)>
+    ),
+    Unique( ~id, skA ), Running( $A, $B, <'R', 'I', z> )
+    ]->
+     [
+     St_A_4( $A, ~id, $B, skA, pkB, ~x, Y, h(z) ),
+     Out( <'A', sign(<'g'^~x, Y>, skA), 
+           <<'0', 'A'>, senc(<'0', 'A'>, h(z))>, pk(skA)>
+     )
+     ]
+    variants (modulo AC)
+    1. ~x    = ~x.11
+       Y     = Y.12
+       z     = Y.12^~x.11
+    
+    2. ~x    = ~x.14
+       Y     = z.18^inv(~x.14)
+       z     = z.18
+    
+    3. ~x    = ~x.292
+       Y     = x.578^x.579
+       z     = x.578^(~x.292*x.579)
+    
+    4. ~x    = ~x.293
+       Y     = x.580^inv((~x.293*x.581))
+       z     = x.580^inv(x.581)
+    
+    5. ~x    = ~x.293
+       Y     = x.580^(x.581*inv(~x.293))
+       z     = x.580^x.581
+    
+    6. ~x    = ~x.294
+       Y     = x.581^(x.582*inv((~x.294*x.583)))
+       z     = x.581^(x.582*inv(x.583))
+  */
+
+rule (modulo E) B_3_receive:
+   [
+   St_B_3( $B, ~id, $A, skB, pkA, X, ~y ),
+   In( <'A', sig, <m, tag>, pkA> )
+   ]
+  --[
+  Receive( $B, <'A', sig, <m, tag>, pkA> ), Unique( ~id, skB ),
+  Equal( verify(sig, <X, 'g'^~y>, pkA), true ),
+  Equal( m, sdec(tag, h(X^~y)) )
+  ]->
+   [ St_B_4( $B, ~id, $A, skB, pkA, X, ~y, h(X^~y) ) ]
+
+  /*
+  rule (modulo AC) B_3_receive:
+     [
+     St_B_3( $B, ~id, $A, skB, pkA, X, ~y ),
+     In( <'A', sig, <m, tag>, pkA> )
+     ]
+    --[
+    Receive( $B, <'A', sig, <m, tag>, pkA> ), Unique( ~id, skB ),
+    Equal( z.1, true ), Equal( m, z.2 )
+    ]->
+     [ St_B_4( $B, ~id, $A, skB, pkA, X, ~y, h(z) ) ]
+    variants (modulo AC)
+     1. ~y    = ~y.16
+        X     = X.17
+        pkA   = pkA.19
+        sig   = sig.20
+        tag   = tag.22
+        z     = X.17^~y.16
+        z.1   = verify(sig.20, <X.17, 'g'^~y.16>, pkA.19)
+        z.2   = sdec(tag.22, h(X.17^~y.16))
+    
+     2. ~y    = ~y.18
+        X     = z.26^inv(~y.18)
+        pkA   = pkA.21
+        sig   = sig.22
+        tag   = tag.24
+        z     = z.26
+        z.1   = verify(sig.22, <z.26^inv(~y.18), 'g'^~y.18>, pkA.21)
+        z.2   = sdec(tag.24, h(z.26))
+    
+     3. ~y    = ~y.18
+        X     = x.29^x.30
+        pkA   = pkA.21
+        sig   = sig.22
+        tag   = tag.24
+        z     = x.29^(~y.18*x.30)
+        z.1   = verify(sig.22, <x.29^x.30, 'g'^~y.18>, pkA.21)
+        z.2   = sdec(tag.24, h(x.29^(~y.18*x.30)))
+    
+     4. ~y    = ~y.19
+        X     = x.31^inv((~y.19*x.32))
+        pkA   = pkA.22
+        sig   = sig.23
+        tag   = tag.25
+        z     = x.31^inv(x.32)
+        z.1   = verify(sig.23, <x.31^inv((~y.19*x.32)), 'g'^~y.19>, pkA.22)
+        z.2   = sdec(tag.25, h(x.31^inv(x.32)))
+    
+     5. ~y    = ~y.19
+        X     = x.31^(x.32*inv(~y.19))
+        pkA   = pkA.22
+        sig   = sig.23
+        tag   = tag.25
+        z     = x.31^x.32
+        z.1   = verify(sig.23, <x.31^(x.32*inv(~y.19)), 'g'^~y.19>, pkA.22)
+        z.2   = sdec(tag.25, h(x.31^x.32))
+    
+     6. ~y    = ~y.20
+        X     = X.21
+        pkA   = pk(x.34)
+        sig   = sign(<X.21, 'g'^~y.20>, x.34)
+        tag   = tag.26
+        z     = X.21^~y.20
+        z.1   = true
+        z.2   = sdec(tag.26, h(X.21^~y.20))
+    
+     7. ~y    = ~y.20
+        X     = z.28^inv(~y.20)
+        pkA   = pk(x.34)
+        sig   = sign(<z.28^inv(~y.20), 'g'^~y.20>, x.34)
+        tag   = tag.26
+        z     = z.28
+        z.1   = true
+        z.2   = sdec(tag.26, h(z.28))
+    
+     8. ~y    = ~y.20
+        X     = x.32^(x.33*inv((~y.20*x.34)))
+        pkA   = pkA.23
+        sig   = sig.24
+        tag   = tag.26
+        z     = x.32^(x.33*inv(x.34))
+        z.1   = verify(sig.24, <x.32^(x.33*inv((~y.20*x.34))), 'g'^~y.20>,
+                       pkA.23)
+        z.2   = sdec(tag.26, h(x.32^(x.33*inv(x.34))))
+    
+     9. ~y    = ~y.21
+        X     = X.22
+        pkA   = pk(x.35)
+        sig   = sign(<X.22, 'g'^~y.21>, x.35)
+        tag   = senc(z.31, h(X.22^~y.21))
+        z     = X.22^~y.21
+        z.1   = true
+        z.2   = z.31
+    
+    10. ~y    = ~y.21
+        X     = z.29^inv(~y.21)
+        pkA   = pk(x.35)
+        sig   = sign(<z.29^inv(~y.21), 'g'^~y.21>, x.35)
+        tag   = senc(z.31, h(z.29))
+        z     = z.29
+        z.1   = true
+        z.2   = z.31
+    
+    11. ~y    = ~y.21
+        X     = x.33^x.34
+        pkA   = pk(x.36)
+        sig   = sign(<x.33^x.34, 'g'^~y.21>, x.36)
+        tag   = tag.27
+        z     = x.33^(~y.21*x.34)
+        z.1   = true
+        z.2   = sdec(tag.27, h(x.33^(~y.21*x.34)))
+    
+    12. ~y    = ~y.21
+        X     = x.33^inv((~y.21*x.34))
+        pkA   = pk(x.36)
+        sig   = sign(<x.33^inv((~y.21*x.34)), 'g'^~y.21>, x.36)
+        tag   = tag.27
+        z     = x.33^inv(x.34)
+        z.1   = true
+        z.2   = sdec(tag.27, h(x.33^inv(x.34)))
+    
+    13. ~y    = ~y.21
+        X     = x.33^(x.34*inv(~y.21))
+        pkA   = pk(x.36)
+        sig   = sign(<x.33^(x.34*inv(~y.21)), 'g'^~y.21>, x.36)
+        tag   = tag.27
+        z     = x.33^x.34
+        z.1   = true
+        z.2   = sdec(tag.27, h(x.33^x.34))
+    
+    14. ~y    = ~y.22
+        X     = x.34^x.35
+        pkA   = pk(x.37)
+        sig   = sign(<x.34^x.35, 'g'^~y.22>, x.37)
+        tag   = senc(z.32, h(x.34^(~y.22*x.35)))
+        z     = x.34^(~y.22*x.35)
+        z.1   = true
+        z.2   = z.32
+    
+    15. ~y    = ~y.22
+        X     = x.34^inv((~y.22*x.35))
+        pkA   = pk(x.37)
+        sig   = sign(<x.34^inv((~y.22*x.35)), 'g'^~y.22>, x.37)
+        tag   = senc(z.32, h(x.34^inv(x.35)))
+        z     = x.34^inv(x.35)
+        z.1   = true
+        z.2   = z.32
+    
+    16. ~y    = ~y.22
+        X     = x.34^(x.35*inv(~y.22))
+        pkA   = pk(x.37)
+        sig   = sign(<x.34^(x.35*inv(~y.22)), 'g'^~y.22>, x.37)
+        tag   = senc(z.32, h(x.34^x.35))
+        z     = x.34^x.35
+        z.1   = true
+        z.2   = z.32
+    
+    17. ~y    = ~y.22
+        X     = x.34^(x.35*inv((~y.22*x.36)))
+        pkA   = pk(x.38)
+        sig   = sign(<x.34^(x.35*inv((~y.22*x.36))), 'g'^~y.22>, x.38)
+        tag   = tag.28
+        z     = x.34^(x.35*inv(x.36))
+        z.1   = true
+        z.2   = sdec(tag.28, h(x.34^(x.35*inv(x.36))))
+    
+    18. ~y    = ~y.23
+        X     = X.24
+        pkA   = pkA.26
+        sig   = sig.27
+        tag   = senc(z.33, h(X.24^~y.23))
+        z     = X.24^~y.23
+        z.1   = verify(sig.27, <X.24, 'g'^~y.23>, pkA.26)
+        z.2   = z.33
+    
+    19. ~y    = ~y.23
+        X     = z.31^inv(~y.23)
+        pkA   = pkA.26
+        sig   = sig.27
+        tag   = senc(z.33, h(z.31))
+        z     = z.31
+        z.1   = verify(sig.27, <z.31^inv(~y.23), 'g'^~y.23>, pkA.26)
+        z.2   = z.33
+    
+    20. ~y    = ~y.23
+        X     = x.35^(x.36*inv((~y.23*x.37)))
+        pkA   = pk(x.39)
+        sig   = sign(<x.35^(x.36*inv((~y.23*x.37))), 'g'^~y.23>, x.39)
+        tag   = senc(z.33, h(x.35^(x.36*inv(x.37))))
+        z     = x.35^(x.36*inv(x.37))
+        z.1   = true
+        z.2   = z.33
+    
+    21. ~y    = ~y.24
+        X     = x.36^x.37
+        pkA   = pkA.27
+        sig   = sig.28
+        tag   = senc(z.34, h(x.36^(~y.24*x.37)))
+        z     = x.36^(~y.24*x.37)
+        z.1   = verify(sig.28, <x.36^x.37, 'g'^~y.24>, pkA.27)
+        z.2   = z.34
+    
+    22. ~y    = ~y.24
+        X     = x.36^inv((~y.24*x.37))
+        pkA   = pkA.27
+        sig   = sig.28
+        tag   = senc(z.34, h(x.36^inv(x.37)))
+        z     = x.36^inv(x.37)
+        z.1   = verify(sig.28, <x.36^inv((~y.24*x.37)), 'g'^~y.24>, pkA.27)
+        z.2   = z.34
+    
+    23. ~y    = ~y.24
+        X     = x.36^(x.37*inv(~y.24))
+        pkA   = pkA.27
+        sig   = sig.28
+        tag   = senc(z.34, h(x.36^x.37))
+        z     = x.36^x.37
+        z.1   = verify(sig.28, <x.36^(x.37*inv(~y.24)), 'g'^~y.24>, pkA.27)
+        z.2   = z.34
+    
+    24. ~y    = ~y.25
+        X     = x.37^(x.38*inv((~y.25*x.39)))
+        pkA   = pkA.28
+        sig   = sig.29
+        tag   = senc(z.35, h(x.37^(x.38*inv(x.39))))
+        z     = x.37^(x.38*inv(x.39))
+        z.1   = verify(sig.29, <x.37^(x.38*inv((~y.25*x.39))), 'g'^~y.25>,
+                       pkA.28)
+        z.2   = z.35
+  */
+
+rule (modulo E) B_4_Send:
+   [ St_B_4( $B, ~id, $A, skB, pkA, X, ~y, h(X^~y) ) ]
+  --[
+  Send( $B,
+        <'B', sign(<X, 'g'^~y>, skB), mac(<'1', 'B'>, h(X^~y)), pk(skB)>
+  ),
+  Secret( $B, h(X^~y) ), Unique( ~id, skB ), Honest( $A ),
+  Honest( $B ), Running( $B, $A, <'I', 'R', X^~y> ),
+  Commit( $B, $A, <'R', 'I', X^~y> )
+  ]->
+   [
+   St_B_5( $B, ~id, $A, skB, pkA, X, ~y, h(X^~y) ),
+   Out( <'B', sign(<X, 'g'^~y>, skB), mac(<'1', 'B'>, h(X^~y)), 
+         pk(skB)>
+   )
+   ]
+
+  /*
+  rule (modulo AC) B_4_Send:
+     [ St_B_4( $B, ~id, $A, skB, pkA, X, ~y, h(z) ) ]
+    --[
+    Send( $B,
+          <'B', sign(<X, 'g'^~y>, skB), 
+           <<'1', 'B'>, senc(<'1', 'B'>, h(z))>, pk(skB)>
+    ),
+    Secret( $B, h(z) ), Unique( ~id, skB ), Honest( $A ), Honest( $B ),
+    Running( $B, $A, <'I', 'R', z> ), Commit( $B, $A, <'R', 'I', z> )
+    ]->
+     [
+     St_B_5( $B, ~id, $A, skB, pkA, X, ~y, h(z) ),
+     Out( <'B', sign(<X, 'g'^~y>, skB), 
+           <<'1', 'B'>, senc(<'1', 'B'>, h(z))>, pk(skB)>
+     )
+     ]
+    variants (modulo AC)
+    1. ~y    = ~y.11
+       X     = X.12
+       z     = X.12^~y.11
+    
+    2. ~y    = ~y.14
+       X     = z.18^inv(~y.14)
+       z     = z.18
+    
+    3. ~y    = ~y.292
+       X     = x.578^x.579
+       z     = x.578^(~y.292*x.579)
+    
+    4. ~y    = ~y.293
+       X     = x.580^inv((~y.293*x.581))
+       z     = x.580^inv(x.581)
+    
+    5. ~y    = ~y.293
+       X     = x.580^(x.581*inv(~y.293))
+       z     = x.580^x.581
+    
+    6. ~y    = ~y.294
+       X     = x.581^(x.582*inv((~y.294*x.583)))
+       z     = x.581^(x.582*inv(x.583))
+  */
+
+rule (modulo E) A_4_receive:
+   [
+   St_A_4( $A, ~id, $B, skA, pkB, ~x, Y, h(Y^~x) ),
+   In( <'B', sig, <m, tag>, pkB> )
+   ]
+  --[
+  Receive( $A, <'B', sig, <m, tag>, pkB> ), Secret( $A, h(Y^~x) ),
+  Unique( ~id, skA ), Honest( $A ), Honest( $B ),
+  Equal( verify(sig, <'g'^~x, Y>, pkB), true ),
+  Equal( m, sdec(tag, h(Y^~x)) ), Commit( $A, $B, <'I', 'R', Y^~x> )
+  ]->
+   [ St_A_5( $A, ~id, $B, skA, pkB, ~x, Y, h(Y^~x) ) ]
+
+  /*
+  rule (modulo AC) A_4_receive:
+     [
+     St_A_4( $A, ~id, $B, skA, pkB, ~x, Y, h(z) ),
+     In( <'B', sig, <m, tag>, pkB> )
+     ]
+    --[
+    Receive( $A, <'B', sig, <m, tag>, pkB> ), Secret( $A, h(z) ),
+    Unique( ~id, skA ), Honest( $A ), Honest( $B ), Equal( z.1, true ),
+    Equal( m, z.2 ), Commit( $A, $B, <'I', 'R', z> )
+    ]->
+     [ St_A_5( $A, ~id, $B, skA, pkB, ~x, Y, h(z) ) ]
+    variants (modulo AC)
+     1. ~x    = ~x.22
+        Y     = Y.23
+        pkB   = pkB.25
+        sig   = sig.26
+        tag   = tag.28
+        z     = Y.23^~x.22
+        z.1   = verify(sig.26, <'g'^~x.22, Y.23>, pkB.25)
+        z.2   = sdec(tag.28, h(Y.23^~x.22))
+    
+     2. ~x    = ~x.23
+        Y     = z.30^inv(~x.23)
+        pkB   = pkB.26
+        sig   = sig.27
+        tag   = tag.29
+        z     = z.30
+        z.1   = verify(sig.27, <'g'^~x.23, z.30^inv(~x.23)>, pkB.26)
+        z.2   = sdec(tag.29, h(z.30))
+    
+     3. ~x    = ~x.26
+        Y     = Y.27
+        pkB   = pkB.29
+        sig   = sig.30
+        tag   = senc(z.36, h(Y.27^~x.26))
+        z     = Y.27^~x.26
+        z.1   = verify(sig.30, <'g'^~x.26, Y.27>, pkB.29)
+        z.2   = z.36
+    
+     4. ~x    = ~x.26
+        Y     = z.33^inv(~x.26)
+        pkB   = pkB.29
+        sig   = sig.30
+        tag   = senc(z.36, h(z.33))
+        z     = z.33
+        z.1   = verify(sig.30, <'g'^~x.26, z.33^inv(~x.26)>, pkB.29)
+        z.2   = z.36
+    
+     5. ~x    = ~x.43
+        Y     = x.80^x.81
+        pkB   = pkB.46
+        sig   = sig.47
+        tag   = tag.49
+        z     = x.80^(~x.43*x.81)
+        z.1   = verify(sig.47, <'g'^~x.43, x.80^x.81>, pkB.46)
+        z.2   = sdec(tag.49, h(x.80^(~x.43*x.81)))
+    
+     6. ~x    = ~x.44
+        Y     = x.82^x.83
+        pkB   = pkB.47
+        sig   = sig.48
+        tag   = senc(z.54, h(x.82^(~x.44*x.83)))
+        z     = x.82^(~x.44*x.83)
+        z.1   = verify(sig.48, <'g'^~x.44, x.82^x.83>, pkB.47)
+        z.2   = z.54
+    
+     7. ~x    = ~x.44
+        Y     = x.82^inv((~x.44*x.83))
+        pkB   = pkB.47
+        sig   = sig.48
+        tag   = tag.50
+        z     = x.82^inv(x.83)
+        z.1   = verify(sig.48, <'g'^~x.44, x.82^inv((~x.44*x.83))>, pkB.47)
+        z.2   = sdec(tag.50, h(x.82^inv(x.83)))
+    
+     8. ~x    = ~x.44
+        Y     = x.82^inv((~x.44*x.83))
+        pkB   = pkB.47
+        sig   = sig.48
+        tag   = senc(z.54, h(x.82^inv(x.83)))
+        z     = x.82^inv(x.83)
+        z.1   = verify(sig.48, <'g'^~x.44, x.82^inv((~x.44*x.83))>, pkB.47)
+        z.2   = z.54
+    
+     9. ~x    = ~x.44
+        Y     = x.82^(x.83*inv(~x.44))
+        pkB   = pkB.47
+        sig   = sig.48
+        tag   = tag.50
+        z     = x.82^x.83
+        z.1   = verify(sig.48, <'g'^~x.44, x.82^(x.83*inv(~x.44))>, pkB.47)
+        z.2   = sdec(tag.50, h(x.82^x.83))
+    
+    10. ~x    = ~x.44
+        Y     = x.82^(x.83*inv(~x.44))
+        pkB   = pkB.47
+        sig   = sig.48
+        tag   = senc(z.54, h(x.82^x.83))
+        z     = x.82^x.83
+        z.1   = verify(sig.48, <'g'^~x.44, x.82^(x.83*inv(~x.44))>, pkB.47)
+        z.2   = z.54
+    
+    11. ~x    = ~x.45
+        Y     = Y.46
+        pkB   = pk(x.85)
+        sig   = sign(<'g'^~x.45, Y.46>, x.85)
+        tag   = tag.51
+        z     = Y.46^~x.45
+        z.1   = true
+        z.2   = sdec(tag.51, h(Y.46^~x.45))
+    
+    12. ~x    = ~x.45
+        Y     = Y.46
+        pkB   = pk(x.85)
+        sig   = sign(<'g'^~x.45, Y.46>, x.85)
+        tag   = senc(z.55, h(Y.46^~x.45))
+        z     = Y.46^~x.45
+        z.1   = true
+        z.2   = z.55
+    
+    13. ~x    = ~x.45
+        Y     = z.52^inv(~x.45)
+        pkB   = pk(x.85)
+        sig   = sign(<'g'^~x.45, z.52^inv(~x.45)>, x.85)
+        tag   = tag.51
+        z     = z.52
+        z.1   = true
+        z.2   = sdec(tag.51, h(z.52))
+    
+    14. ~x    = ~x.45
+        Y     = z.52^inv(~x.45)
+        pkB   = pk(x.85)
+        sig   = sign(<'g'^~x.45, z.52^inv(~x.45)>, x.85)
+        tag   = senc(z.55, h(z.52))
+        z     = z.52
+        z.1   = true
+        z.2   = z.55
+    
+    15. ~x    = ~x.45
+        Y     = x.83^(x.84*inv((~x.45*x.85)))
+        pkB   = pkB.48
+        sig   = sig.49
+        tag   = tag.51
+        z     = x.83^(x.84*inv(x.85))
+        z.1   = verify(sig.49, <'g'^~x.45, x.83^(x.84*inv((~x.45*x.85)))>,
+                       pkB.48)
+        z.2   = sdec(tag.51, h(x.83^(x.84*inv(x.85))))
+    
+    16. ~x    = ~x.45
+        Y     = x.83^(x.84*inv((~x.45*x.85)))
+        pkB   = pkB.48
+        sig   = sig.49
+        tag   = senc(z.55, h(x.83^(x.84*inv(x.85))))
+        z     = x.83^(x.84*inv(x.85))
+        z.1   = verify(sig.49, <'g'^~x.45, x.83^(x.84*inv((~x.45*x.85)))>,
+                       pkB.48)
+        z.2   = z.55
+    
+    17. ~x    = ~x.46
+        Y     = x.84^x.85
+        pkB   = pk(x.87)
+        sig   = sign(<'g'^~x.46, x.84^x.85>, x.87)
+        tag   = tag.52
+        z     = x.84^(~x.46*x.85)
+        z.1   = true
+        z.2   = sdec(tag.52, h(x.84^(~x.46*x.85)))
+    
+    18. ~x    = ~x.46
+        Y     = x.84^x.85
+        pkB   = pk(x.87)
+        sig   = sign(<'g'^~x.46, x.84^x.85>, x.87)
+        tag   = senc(z.56, h(x.84^(~x.46*x.85)))
+        z     = x.84^(~x.46*x.85)
+        z.1   = true
+        z.2   = z.56
+    
+    19. ~x    = ~x.46
+        Y     = x.84^inv((~x.46*x.85))
+        pkB   = pk(x.87)
+        sig   = sign(<'g'^~x.46, x.84^inv((~x.46*x.85))>, x.87)
+        tag   = tag.52
+        z     = x.84^inv(x.85)
+        z.1   = true
+        z.2   = sdec(tag.52, h(x.84^inv(x.85)))
+    
+    20. ~x    = ~x.46
+        Y     = x.84^inv((~x.46*x.85))
+        pkB   = pk(x.87)
+        sig   = sign(<'g'^~x.46, x.84^inv((~x.46*x.85))>, x.87)
+        tag   = senc(z.56, h(x.84^inv(x.85)))
+        z     = x.84^inv(x.85)
+        z.1   = true
+        z.2   = z.56
+    
+    21. ~x    = ~x.46
+        Y     = x.84^(x.85*inv(~x.46))
+        pkB   = pk(x.87)
+        sig   = sign(<'g'^~x.46, x.84^(x.85*inv(~x.46))>, x.87)
+        tag   = tag.52
+        z     = x.84^x.85
+        z.1   = true
+        z.2   = sdec(tag.52, h(x.84^x.85))
+    
+    22. ~x    = ~x.46
+        Y     = x.84^(x.85*inv(~x.46))
+        pkB   = pk(x.87)
+        sig   = sign(<'g'^~x.46, x.84^(x.85*inv(~x.46))>, x.87)
+        tag   = senc(z.56, h(x.84^x.85))
+        z     = x.84^x.85
+        z.1   = true
+        z.2   = z.56
+    
+    23. ~x    = ~x.47
+        Y     = x.85^(x.86*inv((~x.47*x.87)))
+        pkB   = pk(x.89)
+        sig   = sign(<'g'^~x.47, x.85^(x.86*inv((~x.47*x.87)))>, x.89)
+        tag   = tag.53
+        z     = x.85^(x.86*inv(x.87))
+        z.1   = true
+        z.2   = sdec(tag.53, h(x.85^(x.86*inv(x.87))))
+    
+    24. ~x    = ~x.47
+        Y     = x.85^(x.86*inv((~x.47*x.87)))
+        pkB   = pk(x.89)
+        sig   = sign(<'g'^~x.47, x.85^(x.86*inv((~x.47*x.87)))>, x.89)
+        tag   = senc(z.57, h(x.85^(x.86*inv(x.87))))
+        z     = x.85^(x.86*inv(x.87))
+        z.1   = true
+        z.2   = z.57
+  */
+
+restriction onekeypername:
+  "∀ A #A.1 #j.
+    ((Register( A ) @ #A.1) ∧ (Register( A ) @ #j)) ⇒ (#A.1 = #j)"
+  // safety formula
+
+restriction equality:
+  "∀ k1 k2 #i. (Equal( k1, k2 ) @ #i) ⇒ (k1 = k2)"
+  // safety formula
+
+restriction unique:
+  "∀ id1 id2 key #i #j.
+    ((Unique( id1, key ) @ #i) ∧ (Unique( id2, key ) @ #j)) ⇒
+    (id1 = id2)"
+  // safety formula
+
+lemma executability:
+  exists-trace
+  "∃ A B K #i #j.
+    (((((Secret( A, K ) @ #i) ∧ (Secret( B, K ) @ #j)) ∧ (¬(A = B))) ∧
+      (¬(∃ B.1 #k. Reveal( B.1 ) @ #k))) ∧
+     (∀ A.1 B.1 id1 id2 #i.1 #j.1.
+       ((Create_I( A.1, id1, 'initiator' ) @ #i.1) ∧
+        (Create_I( B.1, id2, 'initiator' ) @ #j.1)) ⇒
+       ((A.1 = B.1) ∧ (id1 = id2)))) ∧
+    (∀ A.1 B.1 id1 id2 #i.1 #j.1.
+      ((Create_R( A.1, id1, 'responder' ) @ #i.1) ∧
+       (Create_R( B.1, id2, 'responder' ) @ #j.1)) ⇒
+      ((A.1 = B.1) ∧ (id1 = id2)))"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ A B K #i #j.
+  (Secret( A, K ) @ #i) ∧ (Secret( B, K ) @ #j)
+ ∧
+  (¬(A = B)) ∧
+  (∀ B.1 #k. (Reveal( B.1 ) @ #k) ⇒ ⊥) ∧
+  (∀ A.1 B.1 id1 id2 #i.1 #j.1.
+    (Create_I( A.1, id1, 'initiator' ) @ #i.1) ∧
+    (Create_I( B.1, id2, 'initiator' ) @ #j.1)
+   ⇒
+    (A.1 = B.1) ∧ (id1 = id2)) ∧
+  (∀ A.1 B.1 id1 id2 #i.1 #j.1.
+    (Create_R( A.1, id1, 'responder' ) @ #i.1) ∧
+    (Create_R( B.1, id2, 'responder' ) @ #j.1)
+   ⇒
+    (A.1 = B.1) ∧ (id1 = id2))"
+*/
+simplify
+solve( Secret( A, K ) @ #i )
+  case A_4_receive
+  solve( St_A_4( $A, ~id, $B, skA, pk(x), ~x.1, Y, h(z) ) ▶₀ #i )
+    case A_3_Send
+    solve( Secret( B.1, h(z) ) @ #j )
+      case B_4_Send
+      solve( St_B_4( $B.1, ~id.1, $A.1, skB, pkA, X, ~y, h(z) ) ▶₀ #j )
+        case B_3_receive
+        solve( !KU( sign(<'g'^~x, Y>, ~skA.1) ) @ #vk.3 )
+          case A_3_Send
+          solve( !KU( sign(<X, 'g'^~y>, ~skA.2) ) @ #vk.13 )
+            case A_3_Send
+            solve( splitEqs(3) )
+              case split_case_1
+              solve( !KU( senc(m.1, h('g'^(~x*~y))) ) @ #vk.16 )
+                case A_3_Send
+                solve( splitEqs(0) )
+                  case split_case_1
+                  solve( !KU( senc(m, h('g'^(~x*~y))) ) @ #vk.11 )
+                    case A_3_Send
+                    solve( !KU( pk(~skA) ) @ #vk.9 )
+                      case A_3_Send
+                      solve( !KU( 'g'^~y ) @ #vk.10 )
+                        case B_2_Send
+                        solve( !KU( 'g'^~x ) @ #vk.12 )
+                          case A_1_Send
+                          SOLVED // trace found
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma noninjectiveagreementINITIATOR:
+  all-traces
+  "∀ a b t #i.
+    (Commit( a, b, <'I', 'R', t> ) @ #i) ⇒
+    ((∃ #j. Running( b, a, <'I', 'R', t> ) @ #j) ∨
+     (∃ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ a b t #i.
+  (Commit( a, b, <'I', 'R', t> ) @ #i)
+ ∧
+  (∀ #j. (Running( b, a, <'I', 'R', t> ) @ #j) ⇒ ⊥) ∧
+  (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
+*/
+simplify
+solve( Commit( a, b, <'I', 'R', t> ) @ #i )
+  case A_4_receive
+  solve( St_A_4( $A, ~id, $B, skA, pk(x), ~x.1, Y, h(t) ) ▶₀ #i )
+    case A_3_Send
+    solve( !KU( sign(<'g'^~x, Y>, ~skA.1) ) @ #vk.3 )
+      case A_3_Send
+      solve( splitEqs(0) )
+        case split_case_01
+        solve( !KU( senc(m, h(Y^~x)) ) @ #vk.7 )
+          case A_3_Send
+          solve( splitEqs(4) )
+            case split_case_1
+            solve( !KU( pk(~skA) ) @ #vk.8 )
+              case A_3_Send
+              SOLVED // trace found
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma injectiveagreementINITIATOR:
+  all-traces
+  "∀ a b t #i.
+    (Commit( a, b, <'I', 'R', t> ) @ #i) ⇒
+    ((∃ #j.
+       ((Running( b, a, <'I', 'R', t> ) @ #j) ∧ (#j < #i)) ∧
+       (¬(∃ a2 b2 #i2.
+           (Commit( a2, b2, <'I', 'R', t> ) @ #i2) ∧ (¬(#i2 = #i))))) ∨
+     (∃ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ a b t #i.
+  (Commit( a, b, <'I', 'R', t> ) @ #i)
+ ∧
+  (∀ #j.
+    (Running( b, a, <'I', 'R', t> ) @ #j)
+   ⇒
+    ((¬(#j < #i)) ∨
+     (∃ a2 b2 #i2.
+       (Commit( a2, b2, <'I', 'R', t> ) @ #i2) ∧ ¬(#i2 = #i)))) ∧
+  (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
+*/
+simplify
+solve( Commit( a, b, <'I', 'R', t> ) @ #i )
+  case A_4_receive
+  solve( St_A_4( $A, ~id, $B, skA, pk(x), ~x.1, Y, h(t) ) ▶₀ #i )
+    case A_3_Send
+    solve( !KU( sign(<'g'^~x, Y>, ~skA.1) ) @ #vk.3 )
+      case A_3_Send
+      solve( splitEqs(0) )
+        case split_case_01
+        solve( !KU( senc(m, h(Y^~x)) ) @ #vk.7 )
+          case A_3_Send
+          solve( splitEqs(4) )
+            case split_case_1
+            solve( !KU( pk(~skA) ) @ #vk.8 )
+              case A_3_Send
+              SOLVED // trace found
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma noninjectiveagreementRESPONDER:
+  all-traces
+  "∀ a b t #i.
+    (Commit( a, b, <'R', 'I', t> ) @ #i) ⇒
+    ((∃ #j. Running( b, a, <'R', 'I', t> ) @ #j) ∨
+     (∃ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ a b t #i.
+  (Commit( a, b, <'R', 'I', t> ) @ #i)
+ ∧
+  (∀ #j. (Running( b, a, <'R', 'I', t> ) @ #j) ⇒ ⊥) ∧
+  (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
+*/
+simplify
+solve( Commit( a, b, <'R', 'I', t> ) @ #i )
+  case B_4_Send
+  solve( St_B_4( $B, ~id, $A, skB, pkA, X, ~y, h(t) ) ▶₀ #i )
+    case B_3_receive
+    solve( !KU( sign(<X, 'g'^~y>, ~skA.1) ) @ #vk.3 )
+      case A_3_Send
+      solve( splitEqs(1) )
+        case split_case_1
+        solve( !KU( senc(m, h('g'^(~x*~y))) ) @ #vk.7 )
+          case A_3_Send
+          solve( splitEqs(3) )
+            case split_case_1
+            solve( !KU( pk(~skA.1) ) @ #vk.8 )
+              case A_3_Send
+              solve( !KU( 'g'^~y ) @ #vk.10 )
+                case B_2_Send
+                solve( !KU( 'g'^~x ) @ #vk.10 )
+                  case A_1_Send
+                  SOLVED // trace found
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma injectiveagreementRESPONDER:
+  all-traces
+  "∀ a b t #i.
+    (Commit( a, b, <'R', 'I', t> ) @ #i) ⇒
+    ((∃ #j.
+       ((Running( b, a, <'R', 'I', t> ) @ #j) ∧ (#j < #i)) ∧
+       (¬(∃ a2 b2 #i2.
+           (Commit( a2, b2, <'R', 'I', t> ) @ #i2) ∧ (¬(#i2 = #i))))) ∨
+     (∃ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ a b t #i.
+  (Commit( a, b, <'R', 'I', t> ) @ #i)
+ ∧
+  (∀ #j.
+    (Running( b, a, <'R', 'I', t> ) @ #j)
+   ⇒
+    ((¬(#j < #i)) ∨
+     (∃ a2 b2 #i2.
+       (Commit( a2, b2, <'R', 'I', t> ) @ #i2) ∧ ¬(#i2 = #i)))) ∧
+  (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
+*/
+simplify
+solve( Commit( a, b, <'R', 'I', t> ) @ #i )
+  case B_4_Send
+  solve( St_B_4( $B, ~id, $A, skB, pkA, X, ~y, h(t) ) ▶₀ #i )
+    case B_3_receive
+    solve( !KU( sign(<X, 'g'^~y>, ~skA.1) ) @ #vk.3 )
+      case A_3_Send
+      solve( splitEqs(1) )
+        case split_case_1
+        solve( !KU( senc(m, h('g'^(~x*~y))) ) @ #vk.7 )
+          case A_3_Send
+          solve( splitEqs(3) )
+            case split_case_1
+            solve( !KU( pk(~skA.1) ) @ #vk.8 )
+              case A_3_Send
+              solve( !KU( 'g'^~y ) @ #vk.10 )
+                case B_2_Send
+                solve( !KU( 'g'^~x ) @ #vk.10 )
+                  case A_1_Send
+                  SOLVED // trace found
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+/* All well-formedness checks were successful. */
+
+end

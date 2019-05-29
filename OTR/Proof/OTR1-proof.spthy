@@ -1,4 +1,4 @@
-theory OTR2 begin
+theory OTR1 begin
 
 // Function signature and definition of the equational theory E
 
@@ -255,13 +255,6 @@ restriction equality:
   "∀ k1 k2 #i. (Equal( k1, k2 ) @ #i) ⇒ (k1 = k2)"
   // safety formula
 
-restriction oneinitiator:
-  "∀ A B id1 id2 #i #j.
-    ((Create_I( A, id1, 'initiator' ) @ #i) ∧
-     (Create_I( B, id2, 'initiator' ) @ #j)) ⇒
-    ((A = B) ∧ (id1 = id2))"
-  // safety formula
-
 restriction unique:
   "∀ id1 id2 key #i #j.
     ((Unique( id1, key ) @ #i) ∧ (Unique( id2, key ) @ #j)) ⇒
@@ -302,64 +295,6 @@ solve( Secret( A, K ) @ #i )
                   solve( !KU( 'g'^~y ) @ #vk.8 )
                     case B_2_Send
                     solve( !KU( 'g'^~x ) @ #vk.9 )
-                      case A_1_Send
-                      SOLVED // trace found
-                    qed
-                  qed
-                qed
-              qed
-            qed
-          qed
-        qed
-      qed
-    qed
-  qed
-qed
-
-lemma injectiveagreementINITIATOR:
-  all-traces
-  "∀ a b t #i.
-    (Commit( a, b, <'I', 'R', t> ) @ #i) ⇒
-    ((∃ #j.
-       ((Running( b, a, <'I', 'R', t> ) @ #j) ∧ (#j < #i)) ∧
-       (¬(∃ a2 b2 #i2.
-           (Commit( a2, b2, <'I', 'R', t> ) @ #i2) ∧ (¬(#i2 = #i))))) ∨
-     (∃ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i)))"
-/*
-guarded formula characterizing all counter-examples:
-"∃ a b t #i.
-  (Commit( a, b, <'I', 'R', t> ) @ #i)
- ∧
-  (∀ #j.
-    (Running( b, a, <'I', 'R', t> ) @ #j)
-   ⇒
-    ((¬(#j < #i)) ∨
-     (∃ a2 b2 #i2.
-       (Commit( a2, b2, <'I', 'R', t> ) @ #i2) ∧ ¬(#i2 = #i)))) ∧
-  (∀ X #r. (Reveal( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
-*/
-simplify
-solve( St_A_2( $A, ~id, $B, skA, pk(skB), ~x ) ▶₀ #i )
-  case A_1_Send
-  solve( !KU( sign(<'2', Y>, ~skA.1) ) @ #vk.3 )
-    case B_2_Send
-    solve( !KU( sign(<'1', X>, ~skA.2) ) @ #vk.8 )
-      case c_sign
-      solve( !KU( ~skA.2 ) @ #vk.11 )
-        case Reveal_ltk
-        solve( splitEqs(1) )
-          case split_case_1
-          solve( !KU( pk(~skA.1) ) @ #vk.8 )
-            case B_2_Send
-            solve( !KU( pk(~skA.2) ) @ #vk.11 )
-              case B_2_Send
-              solve( !KU( sign(<'1', X.1>, ~skA.3) ) @ #vk.16 )
-                case A_1_Send
-                solve( !KU( 'g'^~y ) @ #vk.10 )
-                  case B_2_Send
-                  solve( !KU( pk(~skA) ) @ #vk.17 )
-                    case A_1_Send
-                    solve( !KU( 'g'^~x ) @ #vk.17 )
                       case A_1_Send
                       SOLVED // trace found
                     qed
