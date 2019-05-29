@@ -108,9 +108,6 @@ rule A_2_receive:
 	, Commit($A, $B, <'I', 'R', Y^~x>)	]->
 	[ St_A_3($A, ~id, $B, skA, pkB, K) ]
 
-restriction onekeypername:
-	"All A #A #j. Register(A)@A & Register(A)@j ==> #A = #j"
-
 restriction equality:
 	"All k1 k2 #i. Equal(k1, k2)@i ==> k1 = k2"
 
@@ -127,6 +124,7 @@ lemma executability:
 			Secret(A, K)@i & Secret(B, K)@j & not (A = B) &
 			not (Ex B #k. Reveal(B)@k)"
 
+// This lemma does not hold
 lemma injectiveagreementINITIATOR:
 	"All a b t #i.
 		Commit(a,b,<'I','R',t>) @i

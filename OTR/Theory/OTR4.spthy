@@ -98,12 +98,13 @@ rule A_3_Send:
 	let 
 		gx = 'g'^~x
 		Km = h(Y^~x)
-		mac = mac(<'0',$A>, Km)
+		mac = mac(<'0', 'A'>, Km)
 		mA1 = <'A', sign{gx, Y}skA, mac, pk(skA)>
 	in
 	[ St_A_3($A, ~id, $B, skA, pkB, ~x, Y)	]
   --[ Send($A, mA1)
   	, Unique(~id, skA)
+  	, Running($A, $B, <'R', 'I', Y^~x>)
 	]->
 	[ St_A_4($A, ~id, $B, skA, pkB, ~x, Y, Km)
 	, Out(mA1) ]
@@ -129,7 +130,7 @@ rule B_4_Send:
 	let 
 		gy = 'g'^~y
 		Km = h(X^~y)
-		mac = mac(<'2',$B>, Km)
+		mac = mac(<'1', 'B'>, Km)
 		mB2 = <'B', sign{X, gy}skB, mac, pk(skB)>
 	in
 	[ St_B_4($B, ~id, $A, skB, pkA, X, ~y, Km) ]
@@ -139,6 +140,7 @@ rule B_4_Send:
 	, Honest($A)
 	, Honest($B)
 	, Running($B, $A, <'I', 'R', X^~y>)
+	, Commit($B, $A, <'R', 'I', X^~y>)
 	]->
 	[  St_B_5($B, ~id, $A, skB, pkA, X, ~y, Km) 
 	, Out(mB2)
@@ -158,7 +160,7 @@ rule A_4_receive:
 	, Unique(~id, skA)
 	, Honest($A)
 	, Honest($B)
-	, Equal(verify(sig, <Y, gx>, pkB), true)
+	, Equal(verify(sig, <gx,Y>, pkB), true)
   	, Equal(m, sdec(tag, Km))
 	, Commit($A, $B, <'I', 'R', Y^~x>)	]->
 	[ St_A_5($A, ~id, $B, skA, pkB, ~x, Y, Km) ]
@@ -175,19 +177,20 @@ restriction unique:
 
 // This lemma gets verified
 lemma executability:
-	exists-trace
-		"Ex A B K #i #j. 
-			Secret(A, K)@i & Secret(B, K)@j & not (A = B) &
-			not (Ex B #k. Reveal(B)@k)"
+  exists-trace
+	"Ex A B K #i #j. 
+		Secret(A, K)@i & Secret(B, K)@j & not (A = B) & not (Ex B #k. Reveal(B)@k)    	
+		& (All A B id1 id2 #i #j. Create_I(A, id1, 'initiator')@i & Create_I(B, id2, 'initiator')@j ==> (A = B) & (id1 = id2))
+    	& (All A B id1 id2 #i #j. Create_R(A, id1, 'responder')@i & Create_R(B, id2, 'responder')@j ==> (A = B) & (id1 = id2))"
 
-// This lemma gets verified
+// This lemma does not hold
 lemma noninjectiveagreementINITIATOR:
 	"All a b t #i.
 		Commit(a,b,<'I','R',t>) @i
 		==> (Ex #j. Running(b,a,<'I','R',t>) @j)
 			| (Ex X #r. Reveal(X)@r & Honest(X) @i)"
 
-// This lemma gets verified
+// This lemma does not hold
 lemma injectiveagreementINITIATOR:
 	"All a b t #i.
 		Commit(a,b,<'I','R',t>) @i
@@ -196,13 +199,14 @@ lemma injectiveagreementINITIATOR:
 			& not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2 & not (#i2 = #i)))
 			| (Ex X #r. Reveal(X)@r & Honest(X) @i)"
 
-// This lemma gets verified
+// This lemma does not hold
 lemma noninjectiveagreementRESPONDER:
 	"All a b t #i.
 		Commit(a,b,<'R','I',t>) @i
 		==> (Ex #j. Running(b,a,<'R','I',t>) @j)
 			| (Ex X #r. Reveal(X)@r & Honest(X) @i)"
 
+// This lemma does not hold
 lemma injectiveagreementRESPONDER:
 	"All a b t #i.
 		Commit(a,b,<'R','I',t>) @i

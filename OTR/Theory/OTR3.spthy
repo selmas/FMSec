@@ -51,6 +51,7 @@ rule A_1_Send:
 	, Fr(~x)
 	]
   --[ Send($A, mA1)
+  	, Running($A, $B, <'R', 'I', <gx, $B>>)
   	, Unique(~id, skA)
 	]->
 	[ St_A_2($A, ~id, $B, skA, pkB, ~x)
@@ -85,7 +86,8 @@ rule B_2_Send:
 	, Unique(~id, skB)
 	, Honest($A)
 	, Honest($B)
-	, Running($B, $A, <'I', 'R', X^~y>)
+	, Running($B, $A, <'I', 'R', K>)
+  	, Commit($B, $A, <'R', 'I', <X, $B>>)
 	]->
 	[ St_B_3($B, ~id, $A, skB, pkA, K)
 	, Out(mB2)
@@ -93,6 +95,7 @@ rule B_2_Send:
 
 rule A_2_receive:
 	let 
+		gx = 'g'^~x
 		mA2 = <Y, sign{'2', Y, $A}skB, pkB>
 		K = h(Y^~x)
 	in
@@ -105,7 +108,7 @@ rule A_2_receive:
 	, Honest($A)
 	, Honest($B)
 	, Equal(verify(sign{'2', Y, $A}skB, <'2', Y, $A>, pkB), true)
-	, Commit($A, $B, <'I', 'R', Y^~x>)	]->
+	, Commit($A, $B, <'I', 'R', K>)	]->
 	[ St_A_3($A, ~id, $B, skA, pkB, K) ]
 
 restriction onekeypername:
@@ -147,6 +150,7 @@ lemma noninjectiveagreementRESPONDER:
 		==> (Ex #j. Running(b,a,<'R','I',t>) @j)
 			| (Ex X #r. Reveal(X)@r & Honest(X) @i)"
 
+// This lemma gets verified
 lemma injectiveagreementRESPONDER:
 	"All a b t #i.
 		Commit(a,b,<'R','I',t>) @i
