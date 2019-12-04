@@ -8,4 +8,4 @@ documents (e.g., e-passports) all over the world. The second protocol is the Off
 
 The project received a total of 95 out of 110 points with some minor flaws and unprecise formulations found.
 
-The assignment instructions can be found in the file `project.pdf`
+The project documentation was in form of a  `Lab Journal` and the precise assignment instructions can be found in the file `project.pdf`
